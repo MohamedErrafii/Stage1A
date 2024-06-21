@@ -31,5 +31,6 @@ b
 z2 <- z2 %>% 
   pivot_wider(names_from = 'region', values_from = 'ant')
 z2
-
-
+print(z2, n=28)
+print(b, n=28)
+b
