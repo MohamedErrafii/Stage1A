@@ -34,3 +34,6 @@ z2
 print(z2, n=28)
 print(b, n=28)
 b
+
+c <- GaussSuppression(z3)
+c
