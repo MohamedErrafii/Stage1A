@@ -91,3 +91,5 @@ datF4
 
 colnames(fs4[["modelMatrix"]])
 fs4[["modelMatrix"]]
+matrice<-rbind(c(1,0,1,0,1),c(1,0,1,1,0),c(1,1,0,0,1),c(1,1,0,1,0))
+y<-qr(matrice)$
