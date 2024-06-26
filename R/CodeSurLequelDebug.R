@@ -42,26 +42,33 @@ fs[["modelMatrix"]]
 df2<-data.frame(values = c(3,4,7,2), 
                 var1 = c("Homme","Homme","Femme","Femme"),
                 var2 = c("Paris","NP","Paris","NP"), stringsAsFactors = FALSE)
+df2
 fs2 <- FormulaSums(df2, values ~ var1*var2, crossTable = TRUE, makeModelMatrix = TRUE)
 fs2
 
 x2 <- fs2$modelMatrix
+x2
 datF2 <- data.frame(fs2$crossTable, values = as.vector(fs2$allSums))
-
+datF2
 # Add primary suppression 
 datF2$primary <- datF2$values
+datF2
 datF2$primary[datF2$values < 5 & datF2$values > 0] <- NA
+datF2
 datF2$suppressedA <- datF2$primary
+datF2
 datF2$suppressedB <- datF2$primary
+datF2
 datF2$suppressedC <- datF2$primary
+datF2
 
 # zero secondary suppressed
 datF2$suppressedA[GaussSuppression(x2, primary = is.na(datF2$primary))] <- NA
-
+datF2
 # zero not secondary suppressed by first in ordering
 datF2$suppressedB[GaussSuppression(x2, c(which(datF2$values == 0), which(datF2$values > 0)), 
                                   primary = is.na(datF2$primary))] <- NA
-
+datF2
 # with singleton
 datF2$suppressedC[GaussSuppression(x2, c(which(datF2$values == 0), which(datF2$values > 0)), 
                                   primary = is.na(datF2$primary), singleton = df2$values == 1)] <- NA
@@ -91,5 +98,11 @@ datF4
 
 colnames(fs4[["modelMatrix"]])
 fs4[["modelMatrix"]]
-matrice<-rbind(c(1,0,1,0,1),c(1,0,1,1,0),c(1,1,0,0,1),c(1,1,0,1,0))
-y<-qr(matrice)$
+X<-rbind(c(1,0,1,0,1,0,0,0,1),c(1,0,1,1,0,0,0,1,0),c(1,1,0,0,1,0,1,0,0),c(1,1,0,1,0,1,0,0,0))
+t(X)
+y<-c(3,4,7,2)
+y
+z<-t(X)%*%y
+z
+a<-GaussSuppressionFromData(df4)
+a
