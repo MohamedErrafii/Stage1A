@@ -1,0 +1,1341 @@
+GaussSuppression1 <- function(x, candidates, primary, printInc, singleton, nForced, singletonMethod, singletonMethod_num, singleton_num, tolGauss, testMaxInt = 0, allNumeric = FALSE,
+                              iFunction, iWait, 
+                              main_primary, idxDD, idxDDunique, candidatesOld, primaryOld, # main_primary also since primary may be changed 
+                              ncol_x_input, ncol_x_with_xExtraPrimary, whenPrimaryForced,
+                              ...) {
+  
+  # Trick:  GaussSuppressionPrintInfo <- message
+  PrintInfo <- get0("GaussSuppressionPrintInfo",ifnotfound = function(x) NULL)
+  
+  gaussSave2enVirOnmEnt <- get0("gaussSave2enVirOnmEnt", ifnotfound = NULL) 
+  if (!is.environment(gaussSave2enVirOnmEnt)) {
+    gaussSave2enVirOnmEnt <- NULL
+  }
+  n2e <- is.null(gaussSave2enVirOnmEnt)
+  
+  
+  if (!is.numeric(iWait)) {
+    iWait <- Inf
+  } else {
+    if (is.na(iWait)) iWait <- Inf
+  }
+  if (!is.function(iFunction)) iWait <- Inf
+  use_iFunction <- iWait < Inf
+  
+  if (use_iFunction) {
+    sys_time <- Sys.time()
+  }
+  
+  unsafePrimary <- integer(0)
+  
+  # testMaxInt is parameter for testing 
+  # The Integer overflow situation will be forced when testMaxInt is exceeded   
+  DoTestMaxInt = testMaxInt > 0
+  
+  # allNumeric is parameter for testing 
+  # All calculations use numeric algorithm when TRUE
+  if(allNumeric){
+    Matrix2listInt <- SSBtools::Matrix2list 
+  }
+  
+  if (printInc) {
+    singletonMethod_print <- c(singletonMethod, singletonMethod_num)
+    singletonMethod_print <- c(singletonMethod_print[!(singletonMethod_print %in% c("none", "num"))])
+    if (!length(singletonMethod_print)) {
+      singletonMethod_print <- "none"
+    }
+    singletonMethod_print <- paste(singletonMethod_print, collapse = "_")
+    cat(paste0("GaussSuppression_", singletonMethod_print))
+    flush.console()
+  }
+  
+  numSingleton <- NumSingleton(singletonMethod_num)
+  if (numSingleton[["singleton2Primary"]] == "T") {
+    singleton2Primary <- TRUE
+    forceSingleton2Primary <- TRUE
+  } else {
+    singleton2Primary <- numSingleton[["singleton2Primary"]] == "t"
+    forceSingleton2Primary <- FALSE
+  }
+  integerUnique <- as.logical(numSingleton[["integerUnique"]])
+  if (is.na(integerUnique)) {  # When 't'
+    integerUnique <- is.integer(singleton_num)
+  }
+  if (integerUnique & !is.integer(singleton_num)) {
+    stop("singleton as integer needed")
+  }
+  if (!integerUnique & is.integer(singleton_num)) {
+    singleton_num <- as.logical(singleton_num)
+  }
+  
+  numSingleton_elimination_ <- numSingleton[["elimination"]]
+  numRevealsMessage <- numSingleton_elimination_ == "f"
+  allow_GAUSS_DUPLICATES <- numSingleton_elimination_ %in% LETTERS
+  numSingleton_elimination_ <- toupper(numSingleton_elimination_)
+  
+  numSingletonElimination <- numSingleton_elimination_ != "F"
+  if (numSingletonElimination) {
+    numRevealsMessage <- get0("force_numRevealsMessage", ifnotfound = FALSE)
+  }
+  WhenProblematicSingletons <- NULL
+  if (numSingleton_elimination_ == "M") WhenProblematicSingletons <- message
+  if (numSingleton_elimination_ == "W") WhenProblematicSingletons <- warning
+  if (numRevealsMessage) WhenProblematicSingletons <- message
+  
+  # F -> 0, t -> 1, T -> 2
+  numSingleton_combinations <- 2L * as.integer(as.logical(numSingleton[["combinations"]]))
+  if (is.na(numSingleton_combinations)) {
+    numSingleton_combinations <- 1L
+  }
+  
+  if (!numSingletonElimination & numSingleton_combinations) {
+    warning('No effect of "combinations" (5th character) whithout "elimination" (4th character).') 
+  }
+  
+  sub2Sum <- as.logical(numSingleton[["sum2"]])
+  if (is.na(sub2Sum)) {  # When 'H'
+    sub2Sum <- TRUE
+    hierarchySearch <- TRUE
+  } else {
+    hierarchySearch <- FALSE
+  }
+  
+  if (singletonMethod == "none") {
+    singleton <- FALSE
+  }
+  if (singletonMethod_num %in% c("none", "num")) {
+    singleton_num <- FALSE
+  }
+  
+  forceForcedNotSingletonNum <- (nForced > 0) & any(singleton_num)
+  forceForcedNotSingletonFreq <- (nForced > 0) & any(singleton)
+  
+  
+  if (forceForcedNotSingletonNum | forceForcedNotSingletonFreq) {
+    cS1 <- which(colSums(x) == 1)
+    cS1 <- cS1[cS1 %in% candidates[seq_len(nForced)]]
+    if (length(cS1)) {
+      cS1rS <- rowSums(x[, cS1, drop = FALSE]) > 0
+      if (forceForcedNotSingletonNum & any(singleton_num & cS1rS)) {
+        if (!is.null(whenPrimaryForced)) {
+          whenPrimaryForced("Singleton marking of forced cells ignored (num)")
+        }
+        singleton_num[cS1rS] <- FALSE  # this is ok when integer: -> 0L 
+      }
+      if (forceForcedNotSingletonFreq & any(singleton & cS1rS)) {
+        if (!is.null(whenPrimaryForced)) {
+          whenPrimaryForced("Singleton marking of forced cells ignored (freq)")
+        }
+        singleton[cS1rS] <- FALSE
+      }
+    }
+  }
+  
+  if (singletonMethod %in% c("anySumOld", "anySumNOTprimaryOld")) {
+    singletonMethod <- sub("Old", "", singletonMethod)
+    sign_here <- function(x) x
+  } else {
+    sign_here <- sign
+  }
+  
+  
+  anySum0 <- singletonMethod == "anySum0"
+  if (singletonMethod == "anySumNOTprimary" | anySum0) {
+    singletonMethod <- "anySum"
+    singletonNOTprimary <- TRUE
+  } else {
+    if (any(singleton)) {
+      colSums_x <- colSums(x)
+      singletonZ <- (colSums(x[singleton, , drop = FALSE]) == 1 & colSums_x == 1)
+      singletonNOTprimary <- (sum(singletonZ) > sum(singletonZ[primary]))
+    } else {
+      singletonNOTprimary <- FALSE
+    }
+    if (singletonNOTprimary) {
+      if (singletonMethod != "anySum")
+        stop('singletonMethod must be "anySumNOTprimary" or "anySum0" when singletons not primary suppressed')
+      warning('singletonMethod is changed to "anySumNOTprimary"')
+    }
+  }
+  
+  
+  parentChildSingleton <- NULL
+  keepSecondary <- integer(0)  # To store A indices that will proceed the elimination process 
+  # after they are found to be secondary suppressed
+  
+  if (singletonNOTprimary) {
+    if (anySum0) {
+      parentChildSingleton <- FindParentChildSingleton(x, candidates, primary, singleton, ncol_x_input, idxDD)
+      # easy1 <- parentChildSingleton$all1  # Simplification in ParentChildExtension.
+      easy1 <- TRUE   # This seems fine when anySum02primary is TRUE
+      if (!is.null(parentChildSingleton)) { 
+        anySum0easy1 <- get0("anySum0easy1", ifnotfound = NULL) # It might appear that easy1 affects the result and not just speed.
+        if (!is.null(anySum0easy1)) {                           # This could be cases with invisible/hidden childs.
+          if (!is.na(anySum0easy1)) {           # It is believed that easy1 = TRUE is the best method in terms of protection anyway. 
+            easy1 <- anySum0easy1               # But it may still be best to turn it off to avoid the possibility of unsafe
+          }                                     # secondary suppressions in rare cases.
+          cat(paste0("_easy1_=_", easy1))  # This is the rationale for the default value. (but now changed due to anySum02primary, see above)
+        }                                       # With "anySum0easy1" it is possible to test.
+        anySum02primary <- get0("anySum02primary", ifnotfound = TRUE)
+        if (!anySum02primary) {
+          cat(paste0("_2primary_=_", anySum02primary))
+        }
+        anySum0maxiter <- get0("anySum0maxiter", ifnotfound = 99)
+        if (anySum0maxiter != 99) {
+          cat(paste0("_maxiter_=_", anySum0maxiter))
+        }
+        anySum0conservative <- get0("anySum0conservative", ifnotfound = TRUE)
+        if (!anySum0conservative) {
+          cat(paste0("_conservative_=_", anySum0conservative))
+        }
+      }
+    }
+  }
+  if (is.null(parentChildSingleton)) {
+    anySum0 <- FALSE
+  }
+  if (!anySum0) {
+    anySum0conservative <- FALSE 
+  }
+  
+  # In order to give information about unsafe cells, "anySum" is internally changed to "subSumAny" when there are forced cells.
+  if (!singletonNOTprimary & singletonMethod == "anySum" & nForced > 0) {
+    singletonMethod <- "subSumAny"
+  }
+  
+  ##
+  ##  START extending x based on singleton
+  ##
+  
+  input_ncol_x <- ncol(x)
+  relevant_ncol_x <- ncol(x)
+  
+  # make new primary suppressed subSum-cells
+  if (sub2Sum | singleton2Primary | forceSingleton2Primary) {  
+    if (any(singleton_num)) {
+      singleton_num_logical <- as.logical(singleton_num)
+      if (singleton2Primary) {   # Change from if(forceSingleton2Primary)  
+        cS1 <- which(colSums(x) == 1)
+        cS1 <- cS1[!(cS1 %in% primary)]
+        if (length(cS1)) {
+          cS1 <- cS1[colSums(x[singleton_num_logical, cS1, drop = FALSE]) == 1]
+        }
+        if (length(cS1)) {
+          if (forceSingleton2Primary) {   # Now forceSingleton2Primary used instead of above
+            primary <- c(primary, cS1)
+            PrintInfo("forceSingleton2Primary is used")
+          }
+        } else {
+          forceSingleton2Primary <- TRUE  # When known that forceSingleton2Primary=TRUE give same result as FALSE (useful later)
+        }
+      }
+      if (singleton2Primary) {
+        singletonNotInPublish <- singleton_num_logical
+        singletonNotInPublish[rowSums(x[, primary[colSums(x[, primary, drop = FALSE]) == 1], drop = FALSE]) > 0] <- FALSE  # singletonNotInPublish[innerprimary] <- FALSE
+        if (any(singletonNotInPublish)) {
+          PrintInfo("singleton2Primary is used")
+          pZ <- Matrix(0, length(singletonNotInPublish), sum(singletonNotInPublish))
+          pZ[cbind(which(singletonNotInPublish), seq_len(sum(singletonNotInPublish)))] <- 1
+          primary <- c(primary, NCOL(x) + seq_len(NCOL(pZ)))  # same code as below
+          x <- cbind(x, pZ)                                   # ---- // -----
+        }
+      }
+      relevant_ncol_x <- ncol(x)
+      if (sub2Sum) {
+        pZs <- x * singleton_num_logical
+        pZ <- x * (rowSums(x[, primary[colSums(x[, primary, drop = FALSE]) == 1], drop = FALSE]) > 0)  #  x * innerprimary
+        pZ[ , primary] <- 0  # Not relevant when already suppressed 
+        if (integerUnique) {
+          if (!is.integer(singleton_num)) {
+            stop("singleton as integer needed, but something is wrong since this check has been done earlier")
+          }
+          relevant_unique_index <- -seq_len(nrow(x))  # negative is guaranteed different from singleton_num
+          relevant_unique_index[singleton_num_logical] <- singleton_num[singleton_num_logical]
+          colSums_pZ_g_1 <- colSums(pZ) > 1
+          if (any(colSums_pZ_g_1)) { # with this, DummyApply problem when onlys zeros in pZ also avoided
+            cols_g_2 <- DummyApply(pZ, relevant_unique_index, function(x) length(unique(x))) > 2
+            colSums_pZ_requirement <- !cols_g_2 & colSums_pZ_g_1
+          } else {
+            colSums_pZ_requirement <- colSums_pZ_g_1
+            cols_g_2 <- FALSE
+          }
+          # colSums(pZ) > 1 since primary already exists when colSums(pZ) == 1
+          # =2 before "&" here similar to =2 in sub2Sum: 
+          #      * two primary suppressed inner cells provided that at least one of them is singleton (colSums(pZs) > 0)
+          #      * Difference is that same singleton counted as 1
+          # =1 before "&" here is extra 
+          #      * All primary suppressed inner cells in group are same singleton and counted as 1 
+          #      * The sum of this group needs protection
+          # =0 before "&" here 
+          #      * will never happen when colSums(pZ) > 1)
+          #
+          freq_max_singleton <- max(table(singleton_num[singleton_num_logical]))
+        } else {  # not integerUnique
+          colSums_pZ_requirement <- colSums(pZ) == 2
+          if (hierarchySearch) {
+            cols_g_2 <- colSums(pZ) > 2
+          }
+          freq_max_singleton <- 1L
+        }
+        if (hierarchySearch) {
+          if (any(cols_g_2)) {
+            cols_g_2 <- which(cols_g_2)
+            PrintInfo(paste("freq_max_singleton for FindDiffMatrix:", freq_max_singleton))
+            diffMatrix <- FindDiffMatrix(x[, primary[colSums(x[, primary, drop = FALSE]) > 1], drop = FALSE], # primary with more than 1, =1 already treated  
+                                         pZ[, cols_g_2, drop = FALSE],  # (x * innerprimary) with more than 2
+                                         freq_max_singleton)
+            colnames(diffMatrix) <- cols_g_2[as.integer(colnames(diffMatrix))]  # now colnames correspond to pZ columns
+            # Is there any difference column that corresponds to a unique contributor? The code below tries to answer.
+            if (ncol(diffMatrix)) {
+              diffMatrix <- diffMatrix[, colSums(diffMatrix[!singleton_num_logical, , drop = FALSE]) == 0, drop = FALSE]
+              diffMatrix <- diffMatrix[singleton_num_logical, , drop = FALSE]
+              if (ncol(diffMatrix)) {
+                colSums_diffMatrix_is1 <- colSums(diffMatrix) == 1
+                if (any(colSums_diffMatrix_is1)) {
+                  PrintInfo("hierarchySearch is used in the standard way")
+                  colSums_pZ_requirement[as.integer(colnames(diffMatrix)[colSums_diffMatrix_is1])] <- TRUE
+                  diffMatrix <- diffMatrix[, !colSums_diffMatrix_is1, drop = FALSE]
+                }
+                if (integerUnique & ncol(diffMatrix)) {
+                  cols_eq_1 <- DummyApply(diffMatrix, relevant_unique_index[singleton_num_logical], function(x) length(unique(x))) == 1
+                  if (any(cols_eq_1)) {
+                    PrintInfo("hierarchySearch is used in combination with integerUnique")
+                    colSums_pZ_requirement[as.integer(colnames(diffMatrix)[cols_eq_1])] <- TRUE
+                  }
+                }
+              }
+            }
+          }
+        }
+        colZ <- ((colSums(pZs) > 0) & colSums_pZ_requirement)
+      } else {
+        colZ <- FALSE  # This is not logical, but due to code change
+      }
+      if (any(colZ)) {
+        pZ <- pZ[, colZ, drop = FALSE]
+        nodupl <- which(!DummyDuplicated(pZ, rnd = TRUE)) # nodupl <- which(!duplicated(as.matrix(t(pZ)))) 
+        pZ <- pZ[, nodupl, drop = FALSE]
+        primary <- c(primary, NCOL(x) + seq_len(NCOL(pZ)))
+        x <- cbind(x, pZ)
+      }
+    }
+  }
+  
+  if (!all(SeqInc(input_ncol_x + 1L, input_ncol_x) %in% primary)) {
+    stop("extending x based on singleton failed")
+  }
+  
+  # make new primary suppressed subSum-cells
+  if (grepl("subSum", singletonMethod)) {
+    if (any(singleton)) {
+      pZ <- x * singleton
+      colZ <- colSums(pZ) > 1
+      if (any(colZ)) {                                     # Same code below  
+        pZ <- pZ[, colZ, drop = FALSE]
+        nodupl <- which(!DummyDuplicated(pZ, rnd = TRUE)) # which(!duplicated(as.matrix(t(pZ)))) 
+        pZ <- pZ[, nodupl, drop = FALSE]
+        primary <- c(primary, NCOL(x) + seq_len(NCOL(pZ)))
+        x <- cbind(x, pZ)
+      }
+    }
+    if (singletonMethod == "subSum") 
+      singleton <- FALSE
+  }
+  
+  keep_all_singleton_primary <- TRUE
+  
+  if (keep_all_singleton_primary) {
+    ddx <- rep(FALSE, ncol(x))
+    ddx[primary] <- DummyDuplicated(x[, primary, drop = FALSE], rnd = TRUE)
+    ddx[seq_len(input_ncol_x)] <- FALSE
+    if (any(ddx)) {
+      x <- x[, !ddx]
+      primary <- primary[seq_len(length(primary) - sum(ddx))]
+      PrintInfo("duplicates found")
+    }
+  } else {
+    ddx <- DummyDuplicated(x, rnd = TRUE)
+    ddx[seq_len(input_ncol_x)] <- FALSE
+    if (any(ddx)) {
+      x <- x[, !ddx]
+      primary <- primary[seq_len(length(primary) - sum(ddx))]
+      PrintInfo("duplicates found")
+    }
+  }
+  
+  ##
+  ##  END extending x based on singleton
+  ##
+  
+  n_relevant_primary <- sum(primary <= relevant_ncol_x)
+  
+  
+  if (!any(singleton)) 
+    singleton <- NULL
+  
+  # Change to unique integers. Other uses of singleton_num are finished  
+  if ((numSingletonElimination|numRevealsMessage) & is.logical(singleton_num)) {
+    singleton_num[singleton_num] <- seq_len(sum(singleton_num))
+  }
+  
+  force_GAUSS_DUPLICATES    <- get0("force_GAUSS_DUPLICATES", ifnotfound = FALSE)
+  order_GAUSS_DUPLICATES    <- get0("order_GAUSS_DUPLICATES", ifnotfound = TRUE)
+  
+  if (!n2e) {
+    orderA <- seq_len(nrow(x))
+  }
+  
+  if (numSingletonElimination|numRevealsMessage) {
+    
+    # singleton_num as rows, primary as columns
+    sspp <- fac2sparse(singleton_num[singleton_num > 0]) %*% x[singleton_num > 0, primary[seq_len(n_relevant_primary)], drop = FALSE]
+    
+    # Indices of primary originated from unique singleton
+    uniqueSingletonPrimary <- which(colSums(sign(sspp)) == 1)
+    if (order_GAUSS_DUPLICATES) {
+      order_singleton_num <- Order_singleton_num(singleton_num)
+    } else {
+      order_singleton_num <- order(singleton_num)
+    }
+    x <- x[order_singleton_num,  , drop = FALSE]
+    singleton_num <- singleton_num[order_singleton_num]
+    if (!is.null(singleton)) {
+      singleton <- singleton[order_singleton_num]
+    }
+    if (!n2e) {
+      orderA <- order_singleton_num
+    }
+  }
+  
+  order_singleton_num  <- NULL
+  
+  if (!is.null(singleton)) {
+    ordSingleton <- order(singleton)
+    singleton <- singleton[ordSingleton]
+    
+    maTRUE <- match(TRUE, singleton)
+    
+    if (!is.na(maTRUE)) {
+      ordyB <- ordSingleton[seq_len(maTRUE - 1)]
+      maxInd <- maTRUE - 1
+    } else {
+      ordyB <- ordSingleton
+      maxInd <- length(singleton)
+    }
+    
+    # maxInd made for subSpace, maxInd2 needed by anySum
+    maxInd2 <- maxInd
+    
+    # Removes cells that are handled by anySum/subSpace anyway
+    # In order to give correct information about unsafe cells, do not remove when there are forced cells.
+    if (!singletonNOTprimary & nForced == 0) {
+      if (!grepl("subSum", singletonMethod)) {
+        primary <- primary[colSums(x[ordyB, primary, drop = FALSE]) != 0]
+      }
+    }
+    
+    A <- Matrix2listInt(x[ordSingleton, candidates, drop = FALSE])
+    if (!n2e) {
+      orderA <- orderA[ordSingleton]
+    }
+    if (grepl("Space", singletonMethod)) {
+      B <- Matrix2listInt(x[ordyB, primary, drop = FALSE])
+      order_singleton_num  <- ordyB
+      if (!n2e) {
+        orderB <- orderA[ordyB]
+      }
+    } else {
+      B <- Matrix2listInt(x[ordSingleton, primary, drop = FALSE])
+      maxInd <- nrow(x)
+      order_singleton_num  <- ordSingleton
+      if (!n2e) {
+        orderB <- orderA[ordSingleton]
+      }
+    }
+  } else {
+    A <- Matrix2listInt(x[, candidates, drop = FALSE])
+    B <- Matrix2listInt(x[, primary, drop = FALSE])
+    maxInd <- nrow(x)
+    if (!n2e) {
+      orderB <- orderA
+    }
+  }
+  
+  
+  if (numSingletonElimination|numRevealsMessage) {
+    
+    #singleton-integer-value when primary originated from unique singleton
+    primarySingletonNum <- rep(0, length(primary))
+    for (i in uniqueSingletonPrimary) {
+      primarySingletonNum[i] <- singleton_num[B$r[[i]][1]]
+    }
+    
+    if (!is.null(order_singleton_num)) {
+      singleton_num <- singleton_num[order_singleton_num]
+    }
+  }
+  
+  
+  m <- nrow(x)
+  n <- length(A$r)
+  nB <- length(B$r)
+  secondary <- rep(FALSE, n)
+  
+  if (printInc) {
+    cat(": ")
+    flush.console()
+  }
+  ii <- 1L
+  nrA <- rep(NA_integer_, n)
+  nrB <- rep(NA_integer_, nB)
+  
+  
+  # To store cumulative factors from ReduceGreatestDivisor
+  # Used to rescale when switching to numeric algorithm (caused by integer overflow).
+  kk_2_factorsA <- rep(1, n)
+  kk_2_factorsB <- rep(1, nB)
+  
+  
+  subUsed <- rep(FALSE, m)  # needed by anySum
+  
+  dot <- "."
+  # dot will change to "-" when integer overflow occur (then numeric algorithm)  
+  dash <- c("-", "=")   # dot <- dash[N_GAUSS_DUPLICATES]
+  # when  N_GAUSS_DUPLICATES==2  dot will change to ":" or "=" (integer overflow) 
+  
+  
+  
+  ###################################################################################################
+  # START - define AnyProportionalGaussInt
+  #         when !numSingletonElimination: 
+  #                         old function outside this function is used (see below)
+  #   Since function defined inside, it is possible to "cheat" and avoid extra input-parameters.
+  #   Now  primarySingletonNum and numSingletonElimination avoided
+  #
+  #  This function reuses code from old branch “Feature/safety-range”. 
+  #  Comments about rangeValues/rangeLimits are from this old code. 
+  #  It is possible to further develop this within this new function.
+  #####################################################################################################
+  
+  
+  Check_s_unique <- function(s_unique, i) {
+    if (length(s_unique) > 1) {
+      return(FALSE)
+    }
+    if (length(s_unique) == 0) {
+      return(TRUE)
+    }
+    if (s_unique == 0) {
+      return(FALSE)
+    }
+    if (s_unique == primarySingletonNum[i]) {
+      return(FALSE)
+    }
+    1L
+  }
+  
+  AnyProportionalGaussInt_NEW <- function(r, x, rB, xB, tolGauss, kk_2_factorsB, singleton_num = NULL) {
+    n <- length(r)
+    if (!n) {
+      return(TRUE)  # Empty 'A-input' regarded as proportional
+    }
+    if (numSingleton_combinations) {
+      if (numSingletonElimination) {
+        s_unique <- unique(singleton_num[r])
+        if (length(s_unique) <= numSingleton_combinations) {
+          if (min(s_unique) > 0) {
+            return(1L)
+          }
+        }
+      }
+    }
+    for (i in seq_along(rB)) {
+      numSingletonEliminationCheck <- numSingletonElimination
+      if(i > n_relevant_primary){
+        numSingletonEliminationCheck <- FALSE
+      }
+      ni <- length(xB[[i]])
+      if (ni) { # Empty 'B-input' not regarded as proportional
+        doCheck <- FALSE
+        if (ni == n) {
+          if (identical(r, rB[[i]])) {        # Same as in old function 
+            doCheck <- TRUE
+            x_here <- x
+            xBi_here <- xB[[i]]
+            if (numSingletonEliminationCheck) {
+              #restLimit <- rangeLimits[i]     # This is new
+              s_unique <- integer(0)
+              r_in_rB <- rep(TRUE, length(r))
+              rB_in_r <- r_in_rB 
+            } else {
+              #restLimit <- 0
+            }
+          }
+        }
+        if (!doCheck) {
+          if (numSingletonEliminationCheck) {
+            if (r[1] %in% rB[[i]]) {         # No gauss elimination if r[1] not in rB[[i]]
+              r_in_rB <- r %in% rB[[i]]
+              rB_in_r <- rB[[i]] %in% r
+              rdiff <- c(r[!r_in_rB], rB[[i]][!rB_in_r])  # elements not common 
+              # sum_rdiff <- sum(rangeValues[rdiff])
+              s_unique <- unique(singleton_num[rdiff])
+              x_here <- x[r_in_rB]                        # x reduced to common elements 
+              xBi_here <- xB[[i]][rB_in_r]                # xB[[i]] reduced to common elements
+              #restLimit <- rangeLimits[i] - sum_rdiff     
+              #doCheck <- restLimit >= 0   # New when non-NULL rangeLimits
+              #doCheck <- (length(s_unique) <= 1) & (min(s_unique) > 0)
+              doCheck <- Check_s_unique(s_unique, i)
+            }
+          }
+        }
+        if (doCheck) {
+          if (n == 1L)
+            return(doCheck)
+          if (identical(x_here, xBi_here))
+            return(doCheck)
+          if (identical(-x_here, xBi_here))
+            return(doCheck)
+          
+          cx1xBi1 <- c(x_here[1], xBi_here[1])
+          if (is.integer(cx1xBi1)) {
+            kk <- ReduceGreatestDivisor(cx1xBi1)
+            suppressWarnings({
+              kk_2_x <- kk[2] * x_here
+              kk_1_xB_i <- kk[1] * xBi_here
+            })
+            if (anyNA(kk_2_x) | anyNA(kk_1_xB_i)) {
+              kk <- as.numeric(kk)
+              kk_2_x <- kk[2] * x_here
+              kk_1_xB_i <- kk[1] * xBi_here
+              
+            }
+            if (identical(kk_2_x, kk_1_xB_i))
+              return(TRUE)
+            if (is.numeric(kk)) {
+              if (all(abs(xBi_here - kk_2_x/kk[1]) < tolGauss))
+                return(TRUE)
+            }
+            if (numSingletonEliminationCheck) { #if (restLimit) {  # Same logical vectors again when TRUE not returned and when rangeLimits used (simplification possible)
+              if (!is.numeric(kk)) {  
+                rrest <- (r[r_in_rB])[kk_2_x != kk_1_xB_i]
+              } else {
+                rrest <- (r[r_in_rB])[!(abs(xBi_here - kk_2_x/kk[1]) < tolGauss)]
+              }
+              s_unique <- unique(c(s_unique, singleton_num[rrest]))
+              check_s_unique <- Check_s_unique(s_unique, i)
+              if (check_s_unique) { #if ((length(s_unique) <= 1) & (min(s_unique) > 0)) {
+                return(check_s_unique) # New possible TRUE-return caused by rangeLimits
+              }
+            }
+            
+          } else {
+            #  Possible code here to look at distribution of numeric computing errors  
+            #  aabb <- abs((xB[[i]] - (cx1xBi1[2]/cx1xBi1[1]) * x)/kk_2_factorsB[i])
+            #  aabb <- aabb[aabb > 0 & aabb < 1e-04]
+            if (all(abs(xBi_here - (cx1xBi1[2]/cx1xBi1[1]) * x_here) < tolGauss * abs(kk_2_factorsB[i])))
+              return(TRUE)
+            if (numSingletonEliminationCheck) {# if (restLimit) {
+              rrest <- (r[r_in_rB])[!(abs(xBi_here - (cx1xBi1[2]/cx1xBi1[1]) * x_here) < tolGauss * abs(kk_2_factorsB[i]))]
+              s_unique <- unique(c(s_unique, singleton_num[rrest]))
+              # if (sum(rangeValues[rrest]) < restLimit) {
+              check_s_unique <- Check_s_unique(s_unique, i)
+              if (check_s_unique) { #if ((length(s_unique) <= 1) & (min(s_unique) > 0)) {
+                return(check_s_unique) # New possible TRUE-return caused by rangeLimits (as above)
+              }
+            }
+          }
+        }
+      }
+    }
+    FALSE
+  }
+  
+  
+  if (force_GAUSS_DUPLICATES) {
+    if (!numSingletonElimination) {
+      singleton_num <- rep(0L, m)
+      numSingletonElimination <- TRUE
+    }
+  }
+  
+  if (numSingletonElimination) {
+    #AnyProportionalGaussInt <- AnyProportionalGaussInt_NEW
+    AnyProportionalGaussInt <- function(...){
+      anyP <- AnyProportionalGaussInt_NEW(A$r[[j]], A$x[[j]], B$r, B$x, tolGauss = tolGauss, kk_2_factorsB = kk_2_factorsB, singleton_num = singleton_num) 
+      if (anyP) return(anyP)
+      if (singleton_num[A$r[[j]]][1] & length(A$r[[j]]) > 1) {   # More may be seen since A$r[[j]]][1] used in AnyProportionalGaussInt_NEW (elimination)
+        r <- c(SeqInc(2, length(A$r[[j]])), 1L)                  # length(A$r[[j]]) > 1  should be unnecessary
+        anyP <- AnyProportionalGaussInt_NEW(A$r[[j]][r], A$x[[j]][r], B$r, B$x, tolGauss = tolGauss, kk_2_factorsB = kk_2_factorsB, singleton_num = singleton_num)
+      }
+      if (anyP) return(anyP)
+      if (N_GAUSS_DUPLICATES == 1) {
+        return(anyP)
+      }
+      anyP <- AnyProportionalGaussInt_NEW(A_DUPLICATE$r[[j]], A_DUPLICATE$x[[j]], B_DUPLICATE$r, B_DUPLICATE$x, tolGauss = tolGauss, kk_2_factorsB = kk_2_factorsB_DUPLICATE, singleton_num = singleton_num_DUPLICATE)
+      if (anyP) return(anyP)
+      if (singleton_num[A_DUPLICATE$r[[j]]][1] & length(A_DUPLICATE$r[[j]]) > 1) {
+        r <- c(SeqInc(2, length(A_DUPLICATE$r[[j]])), 1L)
+        anyP <- AnyProportionalGaussInt_NEW(A_DUPLICATE$r[[j]][r], A_DUPLICATE$x[[j]][r], B_DUPLICATE$r, B_DUPLICATE$x, tolGauss = tolGauss, kk_2_factorsB = kk_2_factorsB_DUPLICATE, singleton_num = singleton_num_DUPLICATE)
+      }
+      anyP
+    }
+    
+  } else {
+    if (get0("testAnyProportionalGaussInt", ifnotfound = FALSE)) {
+      AnyProportionalGaussInt <- function(...) {
+        apgiOLD <- AnyProportionalGaussInt_OLD(...)
+        apgiNEW <- AnyProportionalGaussInt_NEW(...)
+        if (apgiOLD != apgiNEW) {
+          stop("AnyProportionalGaussInt NEW/OLD problem")
+        } 
+        apgiOLD
+      }
+    } else {
+      AnyProportionalGaussInt <- AnyProportionalGaussInt_OLD
+    }
+  }
+  
+  #####################################################################
+  # END - define AnyProportionalGaussInt
+  #####################################################################
+  
+  eliminatedRows <- rep(FALSE, m)
+  
+  MessageProblematicSingletons <- function() {   # internal function since used twice below
+    if (!n2e) {
+      gaussenv <- as.list(parent.frame())
+      list2env(list(gaussenv = gaussenv), envir = gaussSave2enVirOnmEnt)
+    }
+    if (!is.null(WhenProblematicSingletons) & (numSingletonElimination|numRevealsMessage)) {
+      if (!numRevealsMessage) {
+        rowsP <- which(eliminatedRows & as.logical(singleton_num))
+        singleP <- singleton_num[rowsP]
+        if (N_GAUSS_DUPLICATES == 2) {
+          rows2 <- DUPLICATE_order_singleton_num[which(eliminatedRows_DUPLICATE & as.logical(singleton_num_DUPLICATE))]
+          rowsP <- rowsP[rowsP %in% rows2]
+          singleP <- singleP[singleP %in% singleton_num[rows2]]
+        }
+        n_unique <- length(unique(singleton_num[as.logical(singleton_num)]))
+        singleP <- unique(singleP)
+        if (!forceSingleton2Primary) {
+          if (length(singleP)) {
+            WhenProblematicSingletons(paste(sum(length(singleP)), "out of", n_unique, "unique singletons problematic. Whether reveals exist is not calculated."))
+          } 
+        }
+      } else {
+        if (!forceSingleton2Primary) {
+          message('Actual reveals cannot be calculated. See ?NumSingleton. Try T as "1st character"?')
+        } else {
+          singleP <- unique(singleton_num[as.logical(singleton_num)])
+          n_unique <- length(singleP)
+        }
+      }
+      if (forceSingleton2Primary) {
+        if (length(singleP)) {
+          eliminatedBySingleton <- rep(FALSE, length(singleP))
+          for (i in seq_len(n_relevant_primary)) {
+            if (!length(B$r[[i]])) {     # Avoid special situation
+              primarySingletonNum[i] <- 0
+            }
+          }
+          B$r <- B$r[seq_len(n_relevant_primary)]
+          B$x <- B$x[seq_len(n_relevant_primary)]
+          primarySingletonNum <- primarySingletonNum[seq_len(n_relevant_primary)]
+          kk_2_factorsB <- kk_2_factorsB[seq_len(n_relevant_primary)]
+          for (i in seq_along(singleP)) {
+            p <- primarySingletonNum == singleP[i]
+            eliminatedBySingleton[i] <- AnyEliminatedBySingleton(list(r = B$r[p], x = B$x[p]), 
+                                                                 list(r = B$r[!p], x = B$x[!p]), 
+                                                                 kk_2_factorsB[p], kk_2_factorsB[!p], 
+                                                                 singleton = singleton,
+                                                                 DoTestMaxInt = DoTestMaxInt, tolGauss = tolGauss,
+                                                                 N_GAUSS_DUPLICATES = N_GAUSS_DUPLICATES, dash = dash,
+                                                                 maxInd = maxInd, testMaxInt = testMaxInt)
+          }
+          if (sum(eliminatedBySingleton)) { 
+            WhenProblematicSingletons(paste(sum(eliminatedBySingleton), "out of", n_unique, "unique singletons can reveal primary cells."))
+          }
+        }
+      }  
+    }
+    NULL
+  }
+  
+  N_GAUSS_DUPLICATES <- 1
+  
+  if (!n2e) {
+    startA <- A
+    startB <- B
+  }
+  
+  # The main Gaussian elimination loop 
+  # Code made for speed, not readability
+  for (j in seq_len(n)) {
+    if (printInc) 
+      if (j%%max(1, n%/%25) == 0) {
+        cat(dot)
+        flush.console()
+      }
+    
+    if (nForced > 0 & j == 1) {
+      is0Br <- sapply(B$r, length) == 0
+    }
+    if (nForced > 0 & ((j == (nForced + 1)) |((ii > m) & (j <= nForced)))) {
+      is0Br_ <- sapply(B$r, length) == 0
+      if (any(is0Br != is0Br_)) {
+        unsafePrimary <- c(unsafePrimary, primary[is0Br != is0Br_]) # c(... since maybe future extension 
+        
+        unsafePrimaryAsFinal <- -SecondaryFinal(secondary = -unsafePrimary, primary = integer(0), idxDD = idxDD, idxDDunique = idxDDunique, candidatesOld = candidatesOld, primaryOld = primaryOld)
+        
+        unsafeOrinary <- unsafePrimaryAsFinal[unsafePrimaryAsFinal <= ncol_x_input]
+        unsafeExtra <- unsafePrimaryAsFinal[unsafePrimaryAsFinal > ncol_x_input  & unsafePrimaryAsFinal <= ncol_x_with_xExtraPrimary]
+        unsafeSingleton <- unsafePrimaryAsFinal[unsafePrimaryAsFinal > ncol_x_with_xExtraPrimary]
+        
+        if (length(unsafeExtra)+length(unsafeSingleton)) {
+          s <- paste0(length(unsafePrimaryAsFinal), " (", length(unsafeOrinary), " ordinary, ", length(unsafeExtra), " extra, ", length(unsafeSingleton), " singleton)")
+        } else {
+          s <- length(unsafeOrinary)
+        }
+        warning(paste(s, "unsafe primary cells due to forced cells"))  #  Forced cells -> All primary cells are not safe
+      }
+    }
+    if (ii > m){ 
+      if (printInc) {
+        cat("\n")
+        flush.console()
+      }
+      MessageProblematicSingletons()
+      return(c(candidates[secondary], -unsafePrimary))
+    }
+    
+    if (length(A$r[[j]])) {
+      if(numSingletonElimination)
+        if((allow_GAUSS_DUPLICATES & singleton_num[A$r[[j]][1]]) | force_GAUSS_DUPLICATES)
+          if(N_GAUSS_DUPLICATES==1){
+            A_DUPLICATE <- A
+            B_DUPLICATE <- B
+            eliminatedRows_DUPLICATE <- eliminatedRows
+            kk_2_factorsA_DUPLICATE <- kk_2_factorsA
+            kk_2_factorsB_DUPLICATE <- kk_2_factorsB
+            eliminatedRows_DUPLICATE <- eliminatedRows
+            
+            DUPLICATE_order_singleton_num <- seq_len(m)
+            singleton_logical <- as.logical(singleton_num)
+            above_maxInd <- rep(FALSE, m)
+            above_maxInd[SeqInc(maxInd + 1, m)] <- TRUE
+            DUPLICATE_order_singleton_num[singleton_logical & above_maxInd]  <- rev(DUPLICATE_order_singleton_num[singleton_logical & above_maxInd])
+            DUPLICATE_order_singleton_num[singleton_logical & !above_maxInd] <- rev(DUPLICATE_order_singleton_num[singleton_logical & !above_maxInd])
+            if (force_GAUSS_DUPLICATES) {   # reverse other cells as well 
+              DUPLICATE_order_singleton_num[!singleton_logical & above_maxInd]  <- rev(DUPLICATE_order_singleton_num[!singleton_logical & above_maxInd])
+              DUPLICATE_order_singleton_num[!singleton_logical & !above_maxInd] <- rev(DUPLICATE_order_singleton_num[!singleton_logical & !above_maxInd])
+            }
+            singleton_num_DUPLICATE <- singleton_num[DUPLICATE_order_singleton_num] 
+            
+            A_DUPLICATE <- A
+            if (n2e) {
+              j_here <- j
+            } else {
+              j_here <- 1L
+            }
+            for(i in SeqInc(j_here, n)){
+              if(any( singleton_logical[A$r[[i]]]) | force_GAUSS_DUPLICATES){
+                A_DUPLICATE$r[[i]] <- DUPLICATE_order_singleton_num[A$r[[i]]]
+                r <- order(A_DUPLICATE$r[[i]])
+                A_DUPLICATE$r[[i]] <- A_DUPLICATE$r[[i]][r]
+                A_DUPLICATE$x[[i]] <- A_DUPLICATE$x[[i]][r]
+              }
+            }
+            B_DUPLICATE <- B
+            for(i in seq_len(nB)){
+              if(any( singleton_logical[B$r[[i]]]) | force_GAUSS_DUPLICATES){
+                B_DUPLICATE$r[[i]] <- DUPLICATE_order_singleton_num[B$r[[i]]]
+                r <- order(B_DUPLICATE$r[[i]])
+                B_DUPLICATE$r[[i]] <- B_DUPLICATE$r[[i]][r]
+                B_DUPLICATE$x[[i]] <- B_DUPLICATE$x[[i]][r]
+              }
+            }
+            
+            N_GAUSS_DUPLICATES <- 2
+            if (dot == ".") {
+              dot <- ":"
+            } else {
+              dot <- dash[N_GAUSS_DUPLICATES]
+            }
+          }      
+      
+      reduced <- FALSE
+      if (j > nForced) {
+        if (is.null(singleton)) {
+          isSecondary <- AnyProportionalGaussInt(A$r[[j]], A$x[[j]], B$r, B$x, tolGauss = tolGauss, kk_2_factorsB = kk_2_factorsB)
+        } else {
+          subSubSec <- A$r[[j]][1] > maxInd2
+          if (grepl("Space", singletonMethod)) {
+            okArj <- A$r[[j]] <= maxInd
+            #isSecondary <- subSubSec | (AnyProportionalGaussInt(A$r[[j]][okArj], A$x[[j]][okArj], B$r, B$x, tolGauss = tolGauss, kk_2_factorsB = kk_2_factorsB))
+            isSecondary <- subSubSec 
+            if (!isSecondary) { 
+              isSecondary <- AnyProportionalGaussInt(A$r[[j]][okArj], A$x[[j]][okArj], B$r, B$x, tolGauss = tolGauss, kk_2_factorsB = kk_2_factorsB)
+            }
+          } else {
+            if (subSubSec & !anySum0conservative) {
+              if (length(unique(sign_here(A$x[[j]]))) > 1) {  #  Old version when sign_here = function(x) x, old text:  # Not proportional to original sum, 
+                if (!any(subUsed[A$r[[j]]])) {     # but can’r be sure after gaussian elimination of another “Not proportional to sum”.
+                  subSubSec <- FALSE               # To be sure, non-overlapping restriction introduced (subUsed) 
+                  subUsed[A$r[[j]]] <- TRUE
+                } else {
+                  # if(printInc) # "Can't-be-sure-suppression" if "AnyProportionalGaussInt(.." is FALSE
+                  #   cat('@')   # More advanced method may improve
+                }
+              }
+            }
+            secondaryTRUE <- TRUE
+            if (subSubSec & singletonNOTprimary) {
+              r_here <- A$r[[j]]
+              length_Arj <- length(r_here)
+              if (anySum0) {
+                r_here <- ParentChildExtension(r_here, A$r, B$r, parentChildSingleton, easy1, anySum0maxiter)
+                if (anySum02primary & length(r_here) > length_Arj) {
+                  secondaryTRUE <- 1L     # To be sure, secondary made primary when anySum0 matters
+                } 
+              }
+              if (!Any0GaussInt(r_here, B$r)) {
+                for (I_GAUSS_DUPLICATES in 1:N_GAUSS_DUPLICATES){        
+                  if(I_GAUSS_DUPLICATES == 2){
+                    A_TEMP <- A
+                    B_TEMP <- B
+                    eliminatedRows_TEMP <- eliminatedRows
+                    singleton_num_TEMP <- singleton_num
+                    
+                    A <- A_DUPLICATE
+                    B <- B_DUPLICATE
+                    eliminatedRows <- eliminatedRows_DUPLICATE
+                    singleton_num <- singleton_num_DUPLICATE
+                  }
+                  subSubSec <- FALSE
+                  for (i in c(keepSecondary, SeqInc(j + 1L, n))) {
+                    j_in_i <- A$r[[i]] %in% r_here
+                    if (all(j_in_i)) {
+                      A$r[[i]] <- integer(0)
+                      A$x[[i]] <- integer(0)
+                    } else {
+                      if (any(j_in_i)) {
+                        A$r[[i]] <- A$r[[i]][!j_in_i]
+                        A$x[[i]] <- A$x[[i]][!j_in_i]
+                      }
+                    }
+                  }
+                  for (i in seq_len(nB)) {
+                    j_in_i <- B$r[[i]] %in% r_here
+                    if (any(j_in_i)) {
+                      B$r[[i]] <- B$r[[i]][!j_in_i]
+                      B$x[[i]] <- B$x[[i]][!j_in_i]
+                    }
+                  }
+                  if (n2e) {
+                    A$r[[j]] <- integer(0)
+                    A$x[[j]] <- integer(0)
+                  }   
+                  isSecondary <- FALSE
+                  eliminatedRows[A$r[[j]]] <- TRUE
+                  if(I_GAUSS_DUPLICATES == 2){
+                    A_DUPLICATE <- A 
+                    B_DUPLICATE <- B 
+                    eliminatedRows_DUPLICATE <- eliminatedRows
+                    singleton_num_DUPLICATE <- singleton_num
+                    
+                    A <- A_TEMP
+                    B <- B_TEMP
+                    eliminatedRows <- eliminatedRows_TEMP
+                    singleton_num <- singleton_num_TEMP
+                  }
+                } # end   for (I_GAUSS_DUPLICATES in 1:N_GAUSS_DUPLICATES){         
+                reduced <- TRUE
+              } else {
+                isSecondary <- secondaryTRUE
+              }
+              
+            } else {
+              #isSecondary <- subSubSec | (AnyProportionalGaussInt(A$r[[j]], A$x[[j]], B$r, B$x, tolGauss = tolGauss, kk_2_factorsB = kk_2_factorsB))
+              isSecondary <- subSubSec
+              if (!isSecondary) {
+                isSecondary <- AnyProportionalGaussInt(A$r[[j]], A$x[[j]], B$r, B$x, tolGauss = tolGauss, kk_2_factorsB = kk_2_factorsB)
+              }
+            }
+          }
+        }
+      } else {
+        isSecondary <- FALSE
+      }
+      if (!isSecondary) {
+        if (!reduced) { 
+          ind <- A$r[[j]][1]
+          
+          
+          #eliminatedRows[ind] <- TRUE        
+          for (I_GAUSS_DUPLICATES in 1:N_GAUSS_DUPLICATES){
+            if(I_GAUSS_DUPLICATES == 2){
+              A_TEMP <- A
+              B_TEMP <- B
+              eliminatedRows_TEMP <- eliminatedRows
+              singleton_num_TEMP <- singleton_num
+              kk_2_factorsA_TEMP <- kk_2_factorsA
+              kk_2_factorsB_TEMP <- kk_2_factorsB
+              
+              A <- A_DUPLICATE
+              B <- B_DUPLICATE
+              eliminatedRows <- eliminatedRows_DUPLICATE
+              singleton_num <- singleton_num_DUPLICATE
+              kk_2_factorsA <- kk_2_factorsA_DUPLICATE
+              kk_2_factorsB <- kk_2_factorsB_DUPLICATE
+              
+              ind <- A$r[[j]][1]
+              #eliminatedRows[ind] <- TRUE
+            }
+            
+            eliminatedRows[ind] <- TRUE
+            
+            
+            nrA[] <- NA_integer_
+            nrB[] <- NA_integer_
+            for (i in c(keepSecondary, SeqInc(j + 1L, n))) 
+              nrA[i] <- match(ind, A$r[[i]])
+            for (i in seq_len(nB)) 
+              nrB[i] <- match(ind, B$r[[i]])
+            
+            Arj <- A$r[[j]][-1L]
+            Axj <- A$x[[j]][-1L]
+            Axj1 <- A$x[[j]][1L]
+            if (n2e) {
+              A$r[[j]] <- integer(0) # NA_integer_
+              A$x[[j]] <- integer(0) # NA_integer_
+            }
+            
+            if (length(Arj) == 0L) {
+              for (i in which(!is.na(nrA))) {
+                if(length(A$r[[i]]) == 1L){
+                  A$r[[i]] <- integer(0)
+                  A$x[[i]] <- integer(0)
+                } else {
+                  A$r[[i]] <- A$r[[i]][-nrA[i]]
+                  A$x[[i]] <- A$x[[i]][-nrA[i]]
+                  if (Scale2one(A$x[[i]])) {
+                    A$x[[i]][] <- 1L
+                    kk_2_factorsA[i] <- 1
+                  }
+                }
+              }
+            } else {
+              for (i in which(!is.na(nrA))) {
+                if (length(A$x[[i]]) == 1L) {
+                  A$r[[i]] <- Arj
+                  A$x[[i]] <- Axj
+                  kk_2_factorsA[i] <- kk_2_factorsA[j] # Factors are inherited when all values are inherited
+                } else {
+                  ai <- Arj
+                  bi <- A$r[[i]][-nrA[i]]
+                  ma <- match(ai, bi)
+                  isnama <- is.na(ma)
+                  ma_isnama <- ma[!isnama]
+                  di <- c(bi, ai[isnama])
+                  if (abs(A$x[[i]][nrA[i]]) == abs(Axj1)) {
+                    suppressWarnings({
+                      if (A$x[[i]][nrA[i]] == Axj1) {
+                        dx <- c(A$x[[i]][-nrA[i]], -Axj[isnama])
+                        dx[ma_isnama] <- dx[ma_isnama] - Axj[!isnama]
+                      } else {
+                        dx <- c(A$x[[i]][-nrA[i]], Axj[isnama])
+                        dx[ma_isnama] <- dx[ma_isnama] + Axj[!isnama]
+                      }
+                      if (DoTestMaxInt) {
+                        if (!anyNA(dx)) {
+                          if (max(dx) > testMaxInt) {
+                            dx[1] <- NA
+                            warning("testMaxInt exceeded")
+                          }
+                        }
+                      }
+                    })
+                    
+                    if (anyNA(dx)) 
+                    {
+                      dot <- dash[N_GAUSS_DUPLICATES] # dot <- "-"
+                      if (A$x[[i]][nrA[i]] == Axj1) {
+                        dx <- as.numeric(c(A$x[[i]][-nrA[i]], -Axj[isnama]))
+                        dx[ma_isnama] <- dx[ma_isnama] - Axj[!isnama]
+                      } else {
+                        dx <- as.numeric(c(A$x[[i]][-nrA[i]], Axj[isnama]))
+                        dx[ma_isnama] <- dx[ma_isnama] + Axj[!isnama]
+                      }
+                      dx <- dx/kk_2_factorsA[i]    # rescale needed since change to numeric
+                      kk_2_factorsA[i] <- 1
+                    } else {
+                      if(!is.integer(dx)){
+                        if(is.integer(A$x[[i]])){  # Change to numeric caused by Axj, rescale needed here also
+                          dx <- dx/kk_2_factorsA[i]
+                          kk_2_factorsA[i] <- 1
+                        }
+                      }
+                    }
+                  } else {
+                    kk <- ReduceGreatestDivisor(c(A$x[[i]][nrA[i]], Axj1))
+                    if(is.integer(kk)){
+                      kk_2_factorsA[i] <- kk[2] * kk_2_factorsA[i]
+                    }
+                    suppressWarnings({
+                      dx <- c(kk[2] * A$x[[i]][-nrA[i]], -kk[1] * Axj[isnama])
+                      dx[ma_isnama] <- dx[ma_isnama] - kk[1] * Axj[!isnama]
+                      if (DoTestMaxInt) {
+                        if (!anyNA(dx)) {
+                          if (max(dx) > testMaxInt) {
+                            dx[1] <- NA
+                            warning("testMaxInt exceeded")
+                          }
+                        }
+                      }
+                    })
+                    if (anyNA(dx)) 
+                    {
+                      dot <- dash[N_GAUSS_DUPLICATES] # dot <- "-"
+                      kk <- as.numeric(kk)
+                      dx <- c(kk[2] * A$x[[i]][-nrA[i]], -kk[1] * Axj[isnama])
+                      dx[ma_isnama] <- dx[ma_isnama] - kk[1] * Axj[!isnama]
+                      dx <- dx/kk_2_factorsA[i]   # rescale needed since change to numeric
+                      kk_2_factorsA[i] <- 1
+                    } else {
+                      if(!is.integer(dx)){
+                        if(is.integer(A$x[[i]])){      # Change to numeric caused by Axj, rescale needed here also
+                          dx <- dx/kk_2_factorsA[i]
+                          kk_2_factorsA[i] <- 1
+                        }
+                      }
+                    }
+                  }
+                  if(is.integer(dx)){
+                    rows <- (dx != 0L)
+                  } else {
+                    rows <- (abs(dx) >= tolGauss)
+                  }
+                  di <- di[rows]
+                  dx <- dx[rows]
+                  r <- order(di)
+                  A$r[[i]] <- di[r]
+                  A$x[[i]] <- dx[r]
+                  if (Scale2one(A$x[[i]])) {
+                    A$x[[i]][] <- 1L
+                    kk_2_factorsA[i] <- 1
+                  }
+                }
+              }
+            }
+            if (!is.null(singleton)) {
+              okInd <- (Arj <= maxInd)
+              Arj <- Arj[okInd]
+              Axj <- Axj[okInd]
+            }
+            if (length(Arj) == 0L) {
+              for (i in which(!is.na(nrB))) {
+                B$r[[i]] <- B$r[[i]][-nrB[i]]
+                B$x[[i]] <- B$x[[i]][-nrB[i]]
+                if (Scale2one(B$x[[i]])) {
+                  B$x[[i]][] <- 1L
+                  kk_2_factorsB[i] <- 1
+                }
+              }
+            } else {
+              for (i in which(!is.na(nrB))) {
+                if (length(B$x[[i]]) == 1L) {
+                  B$r[[i]] <- Arj
+                  B$x[[i]] <- Axj
+                  kk_2_factorsB[i] <- kk_2_factorsA[j] # Factors are inherited when all values are inherited
+                } else {
+                  ai <- Arj
+                  bi <- B$r[[i]][-nrB[i]]
+                  ma <- match(ai, bi)
+                  isnama <- is.na(ma)
+                  ma_isnama <- ma[!isnama]
+                  di <- c(bi, ai[isnama])
+                  if (abs(B$x[[i]][nrB[i]]) == abs(Axj1)) {
+                    suppressWarnings({
+                      if (B$x[[i]][nrB[i]] == Axj1) {
+                        dx <- c(B$x[[i]][-nrB[i]], -Axj[isnama])
+                        dx[ma_isnama] <- dx[ma_isnama] - Axj[!isnama]
+                      } else {
+                        dx <- c(B$x[[i]][-nrB[i]], Axj[isnama])
+                        dx[ma_isnama] <- dx[ma_isnama] + Axj[!isnama]
+                      }
+                      if (DoTestMaxInt) {
+                        if (!anyNA(dx)) {
+                          if (max(dx) > testMaxInt) {
+                            dx[1] <- NA
+                            warning("testMaxInt exceeded")
+                          }
+                        }
+                      }
+                    })
+                    if (anyNA(dx)) 
+                    {
+                      dot <- dash[N_GAUSS_DUPLICATES] # dot <- "-"
+                      if (B$x[[i]][nrB[i]] == Axj1) {
+                        dx <- as.numeric(c(B$x[[i]][-nrB[i]], -Axj[isnama]))
+                        dx[ma_isnama] <- dx[ma_isnama] - Axj[!isnama]
+                      } else {
+                        dx <- as.numeric(c(B$x[[i]][-nrB[i]], Axj[isnama]))
+                        dx[ma_isnama] <- dx[ma_isnama] + Axj[!isnama]
+                      }
+                      dx <- dx/kk_2_factorsB[i]
+                      kk_2_factorsB[i] <- 1
+                    }
+                    else {
+                      if(!is.integer(dx)){
+                        if(is.integer(B$x[[i]])){
+                          dx <- dx/kk_2_factorsB[i]
+                          kk_2_factorsB[i] <- 1
+                        }
+                      }
+                    }
+                  } else {
+                    kk <- ReduceGreatestDivisor(c(B$x[[i]][nrB[i]], Axj1))
+                    if(is.integer(kk)){
+                      kk_2_factorsB[i] <- kk[2] * kk_2_factorsB[i]
+                    }
+                    suppressWarnings({
+                      dx <- c(kk[2] * B$x[[i]][-nrB[i]], -kk[1] * Axj[isnama])
+                      dx[ma_isnama] <- dx[ma_isnama] - kk[1] * Axj[!isnama]
+                      if (DoTestMaxInt) {
+                        if (!anyNA(dx)) {
+                          if (max(dx) > testMaxInt) {
+                            dx[1] <- NA
+                            warning("testMaxInt exceeded")
+                          }
+                        }
+                      }
+                    })
+                    if (anyNA(dx)) 
+                    {
+                      dot <- dash[N_GAUSS_DUPLICATES] # dot <- "-"
+                      kk <- as.numeric(kk)
+                      dx <- c(kk[2] * B$x[[i]][-nrB[i]], -kk[1] * Axj[isnama])
+                      dx[ma_isnama] <- dx[ma_isnama] - kk[1] * Axj[!isnama]
+                      dx <- dx/kk_2_factorsB[i]
+                      kk_2_factorsB[i] <- 1
+                    } else {
+                      if(!is.integer(dx)){
+                        if(is.integer(B$x[[i]])){
+                          dx <- dx/kk_2_factorsB[i]
+                          kk_2_factorsB[i] <- 1
+                        }
+                      }
+                    }
+                  }
+                  if(is.integer(dx)){
+                    rows <- (dx != 0L)
+                  } else {
+                    rows <- (abs(dx) >= tolGauss)
+                  }
+                  if(!length(rows)){
+                    stop("Suppression method failed")
+                  }
+                  di <- di[rows]
+                  dx <- dx[rows]
+                  r <- order(di)
+                  B$r[[i]] <- di[r]
+                  B$x[[i]] <- dx[r]
+                  if (Scale2one(B$x[[i]])) {
+                    B$x[[i]][] <- 1L
+                    kk_2_factorsB[i] <- 1
+                  }
+                }
+              }
+            }
+            
+            
+            if(I_GAUSS_DUPLICATES == 2){
+              A_DUPLICATE <- A 
+              B_DUPLICATE <- B 
+              eliminatedRows_DUPLICATE <- eliminatedRows
+              singleton_num_DUPLICATE <- singleton_num
+              kk_2_factorsA_DUPLICATE <- kk_2_factorsA
+              kk_2_factorsB_DUPLICATE <- kk_2_factorsB
+              
+              A <- A_TEMP
+              B <- B_TEMP
+              eliminatedRows <- eliminatedRows_TEMP
+              singleton_num <- singleton_num_TEMP
+              kk_2_factorsA <- kk_2_factorsA_TEMP
+              kk_2_factorsB <- kk_2_factorsB_TEMP
+            }
+          } # end   for (I_GAUSS_DUPLICATES in 1:N_GAUSS_DUPLICATES){           
+        }  
+        ii <- ii + 1L
+      } else {
+        if (!is.logical(isSecondary)) {   #  Special AnyProportionalGaussInt output
+          B$r <- c(B$r, A$r[j])
+          B$x <- c(B$x, A$x[j])
+          kk_2_factorsB <- c(kk_2_factorsB, kk_2_factorsA[j])
+          if (N_GAUSS_DUPLICATES == 2) {
+            B_DUPLICATE$r <- c(B_DUPLICATE$r, A_DUPLICATE$r[j])
+            B_DUPLICATE$x <- c(B_DUPLICATE$x, A_DUPLICATE$x[j])
+            kk_2_factorsB_DUPLICATE <- c(kk_2_factorsB_DUPLICATE, kk_2_factorsA_DUPLICATE[j])
+          }
+          nB <- nB + 1L
+        }
+        if (j %in% parentChildSingleton$uniqueA) {
+          keepSecondary <- c(keepSecondary, j)
+        } else {
+          A$r[[j]] <- integer(0)
+          A$x[[j]] <- integer(0)
+          if (N_GAUSS_DUPLICATES == 2) {
+            A_DUPLICATE$r[[j]] <- integer(0)
+            A_DUPLICATE$x[[j]] <- integer(0)
+          }
+        }
+        secondary[j] <- TRUE
+      }
+    }
+    if (use_iFunction) {
+      sys_time2 <- Sys.time()
+      if (ii-1L == m) {
+        j_ <- n
+      } else {
+        j_ <- j
+      }
+      if (j_ == n) {
+        iWait <- 0
+      }
+      if (as.numeric(difftime(sys_time2, sys_time), units = "secs") >= iWait){
+        sys_time <- sys_time2
+        false_ <- !secondary
+        
+        allEmptyDecided <- TRUE 
+        if(allEmptyDecided){
+          false_[SeqInc(j_+1,n)] <- (lengths(A$r) == 0)[SeqInc(j_+1,n)]
+          na_ <- !(secondary | false_)  
+        } else { # old code 
+          false_[SeqInc(j_+1,n)] <- FALSE
+          na_    <- !secondary
+          na_[SeqInc(1,j_)] <- FALSE
+        }
+        
+        iFunction(i = j_, I = n, j = ii-1L, J = m,
+                  true =  SecondaryFinal(secondary = candidates[secondary], primary = main_primary, idxDD = idxDD, idxDDunique = idxDDunique, candidatesOld = candidatesOld, primaryOld = primaryOld),
+                  false = SecondaryFinal(secondary = candidates[false_],    primary = integer(0),   idxDD = idxDD, idxDDunique = idxDDunique, candidatesOld = candidatesOld, primaryOld = integer(0)),
+                  na =    SecondaryFinal(secondary = candidates[na_],       primary = integer(0),   idxDD = idxDD, idxDDunique = idxDDunique, candidatesOld = candidatesOld, primaryOld = integer(0)),
+                  ...)
+      }
+    }
+  }
+  
+  # cat("\n")
+  # print(table(kk_2_factorsA))
+  # print(table(kk_2_factorsB))
+  # print(table(sapply(A$x,class)))
+  # print(table(sapply(B$x,class)))
+  
+  if (printInc) {
+    cat("\n")
+    flush.console()
+  }
+  MessageProblematicSingletons()
+  c(candidates[secondary], -unsafePrimary)
+}

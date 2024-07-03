@@ -1,4 +1,5 @@
 rm(list=ls())
+install.packages("GaussSuppression")
 library(GaussSuppression)
 library(SSBtools)
 # Données initiales
@@ -55,11 +56,68 @@ gaussian_elimination <- function(A) {
         cat("\n")
       }
     }
+    else {
+      if(i>1){
+        L<-A[1:(i-1),]
+        print(L)
+        M<-A[i:n,1:i]
+        print(M)
+        N<-A[i:n,(i+1):n]
+        P<-gaussian_elimination(N)
+        print(P)
+        Q<-cbind(M,P)
+        print(Q)
+        R<-rbind(L,Q)
+        R
+      }
+      else {
+        M<-A[i:n,1:i]
+        print(M)
+        N<-A[i:n,(i+1):n]
+        P<-gaussian_elimination(N)
+        print(P)
+        Q<-cbind(M,P)
+        print(Q)
+      }
+    }
     
   }
   A
 }
+
+
+
+f<-rownames(datF[datF$values<3 & datF$values>0 ,])
+f
+g<-paste0(datF[f,"var1"],"-",datF[f,"var2"])
+g
+X<-x[,g]
+X
+f2<-rownames(datF[!(datF$values<3 & datF$values>0) ,])
+f2
+g2<-paste0(datF[f2,"var1"],"-",datF[f2,"var2"])
+g2
+X2<-x[,g2]
+X2
+X3<-cbind(X2,X)
+X3
+y<-gaussian_elimination(X3)
+a<-nrow(y)
+b<-y[a,]
+b
+#b[1]
+#b[23]
+a <- c()
+for (i in 1:length(b)){
+  if (b[i]!=0){
+    a<-append(a,i)
+  }
+  a
+}
+
+
+
 y<-gaussian_elimination(x)
 a<-nrow(y)
 b<-y[a,]
-
+?get0
