@@ -1,11 +1,11 @@
 rm(list=ls())
-install.packages("GaussSuppression")
+#install.packages("GaussSuppression")
 library(GaussSuppression)
 library(SSBtools)
 # Données initiales
-df <- data.frame(values = c(1, 1, 1, 5, 5, 9, 9, 9, 9, 9, 0, 0, 0, 7, 7), 
-                 var1 = rep(1:3, each = 5), 
-                 var2 = c("A", "B", "C", "D", "E"), stringsAsFactors = FALSE)
+df <- data.frame(values = c(3, 4, 7, 2), 
+                 var1 = c("homme", "homme", "femme", "femme"), 
+                 var2 = c("p", "np", "p", "np"), stringsAsFactors = FALSE)
 
 # Make output data frame and x 
 fs <- FormulaSums(df, values ~ var1 * var2, crossTable = TRUE, makeModelMatrix = TRUE)
@@ -25,65 +25,70 @@ datF
 
 #Sans GaussSuppression 
 
-gaussian_elimination <- function(A) {
+echelonner_matrice <- function(A) {
   n <- nrow(A)
+  m <- ncol(A)
   
-  cat("Matrice initiale:\n")
-  print(A)
-  cat("\n")
+  # Travailler sur une copie de la matrice originale pour ne pas la modifier directement et la préserver pour d'autres opérations
+  matrice_echelonnee <- A
   
-  # Étape de la triangulation
-  for (i in 1:(n-1)) {
-    # Recherche du maximum dans la colonne i
-    max_row <- which.max(abs(A[i:n, i])) + (i-1)
-    
-    
-    # Échange des lignes si nécessaire
-    if (max_row != i) {
-      cat("Échanger les lignes", i, "et", max_row, ":\n")
-      A[c(i, max_row), ] <- A[c(max_row, i), ]
-      print(A)
-      cat("\n")
-    }
-    
-    # Élimination des coefficients en dessous du pivot
-    if (A[i,i] !=0){
-      for (j in (i+1):n) {
-        factor <- A[j, i] / A[i, i]
-        A[j, ] <- A[j, ] - factor * A[i, ]
-        cat("Éliminer les coefficients en dessous du pivot dans la colonne", i, ":\n")
-        print(A)
-        cat("\n")
+  # Indice pour suivre la colonne et la ligne
+  pivot_col <- 1
+  pivot_row <- 1
+  
+  while (pivot_row<n) {
+    while (pivot_col<(m+1)){
+      #recherche d'une colonne non nul
+      non_zero_col<-c()
+      for (i in pivot_row:n){
+        if (matrice_echelonnee[i,pivot_col] !=0){
+          non_zero_col<-c(non_zero_col,i)
+        }
       }
-    }
-    else {
-      if(i>1){
-        L<-A[1:(i-1),]
-        print(L)
-        M<-A[i:n,1:i]
-        print(M)
-        N<-A[i:n,(i+1):n]
-        P<-gaussian_elimination(N)
-        print(P)
-        Q<-cbind(M,P)
-        print(Q)
-        R<-rbind(L,Q)
-        R
+      if (is.na(non_zero_col[1])) {
+        pivot_col <- pivot_col + 1
+        next
       }
       else {
-        M<-A[i:n,1:i]
-        print(M)
-        N<-A[i:n,(i+1):n]
-        P<-gaussian_elimination(N)
-        print(P)
-        Q<-cbind(M,P)
-        print(Q)
+        r<-non_zero_col[1]
+        #échange de ligne si nécessaire
+        if (pivot_row != r) {
+          matrice_echelonnee[c(pivot_row, r), ] <- matrice_echelonnee[c(r, pivot_row), ]
+        }
+        # Diviser la ligne du pivot par le pivot(normalement inutile car la matrice de contribution est une "dummy matrix"(composée de zéro et un))
+        pivot_value <- matrice_echelonnee[pivot_row, pivot_col]
+        matrice_echelonnee[pivot_row, ] <- matrice_echelonnee[pivot_row, ] / pivot_value
+        
+        # Élimination des éléments en dessous du pivot
+        for (elim_row in (pivot_row + 1):n) {
+          elimination_factor <- matrice_echelonnee[elim_row, pivot_col]
+          matrice_echelonnee[elim_row, ] <- matrice_echelonnee[elim_row, ] - elimination_factor * matrice_echelonnee[pivot_row, ]
+          
+        }
+        
+        # Passer à la colonne et la ligne suivante
+        pivot_col <- pivot_col + 1
       }
+      
+      return(matrice_echelonnee)
     }
-    
+    pivot_row <- pivot_row + 1
   }
-  A
 }
+    
+  
+
+# Exemple d'utilisation avec une matrice singulière
+A <- matrix(c(1, 2, 3, 2, 4, 6), nrow = 2, byrow = TRUE)
+
+# Échelonner la matrice
+matrice_echelonnee <- echelonner_matrice(A)
+
+print("Matrice originale :")
+print(A)
+
+print("Matrice échelonnée :")
+print(matrice_echelonnee)
 
 
 
@@ -101,8 +106,10 @@ X2<-x[,g2]
 X2
 X3<-cbind(X2,X)
 X3
-y<-gaussian_elimination(X3)
+y<-echelonner_matrice(X3)
+y
 a<-nrow(y)
+a
 b<-y[a,]
 b
 #b[1]
@@ -117,7 +124,8 @@ for (i in 1:length(b)){
 
 
 
-y<-gaussian_elimination(x)
+y<-echelonner_matrice(x)
 a<-nrow(y)
 b<-y[a,]
 ?get0
+

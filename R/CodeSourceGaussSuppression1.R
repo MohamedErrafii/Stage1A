@@ -13,7 +13,6 @@ GaussSuppression1 <- function(x, candidates, primary, printInc, singleton, nForc
   }
   n2e <- is.null(gaussSave2enVirOnmEnt)
   
-  
   if (!is.numeric(iWait)) {
     iWait <- Inf
   } else {
@@ -1339,3 +1338,4 @@ GaussSuppression1 <- function(x, candidates, primary, printInc, singleton, nForc
   MessageProblematicSingletons()
   c(candidates[secondary], -unsafePrimary)
 }
+
