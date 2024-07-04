@@ -45,11 +45,7 @@ echelonner_matrice <- function(A) {
           non_zero_col<-c(non_zero_col,i)
         }
       }
-      if (is.na(non_zero_col[1])) {
-        pivot_col <- pivot_col + 1
-        next
-      }
-      else {
+      if (any(!is.na(non_zero_col))) {
         r<-non_zero_col[1]
         #échange de ligne si nécessaire
         if (pivot_row != r) {
@@ -65,15 +61,15 @@ echelonner_matrice <- function(A) {
           matrice_echelonnee[elim_row, ] <- matrice_echelonnee[elim_row, ] - elimination_factor * matrice_echelonnee[pivot_row, ]
           
         }
+       # Passer à la ligne suivante
+        pivot_row <- pivot_row + 1
         
-        # Passer à la colonne et la ligne suivante
-        pivot_col <- pivot_col + 1
+       
       }
-      
-      return(matrice_echelonnee)
+      pivot_col <- pivot_col + 1
     }
-    pivot_row <- pivot_row + 1
   }
+  return(matrice_echelonnee)
 }
     
   
