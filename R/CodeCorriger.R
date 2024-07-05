@@ -92,13 +92,16 @@ print(matrice_echelonnee)
 f <- rownames(datF[datF$values < 2 ,])#& datF$values > 0,])
 g <- paste0(datF[f, "var1"], "-", datF[f, "var2"])
 X <- x[, g]
-f2 <- rownames(datF[!(datF$values < 3 & datF$values > 0),])
+f2 <- rownames(datF[!(datF$values < 2),])# & datF$values > 0),])
 g2 <- paste0(datF[f2, "var1"], "-", datF[f2, "var2"])
 X2 <- x[, g2]
 X3 <- cbind(X2, X)
+colnames(X3)
 y <- echelonner_matrice(X3)
+y
 a <- nrow(y)
 b <- y[a,]
+b
 
 indices_non_zero <- which(b != 0)
 
