@@ -5,8 +5,7 @@ library(tidyverse)
 library(curl)
 library(readxl)
 
-
-rm(list=ls())
+rm(list=ls())rhvihzo
 
 
 
@@ -85,7 +84,8 @@ datF$primary[datF$values < 2 & datF$values > 0] <- NA
 datF$suppressedA <- datF$primary
 
 # with singleton
-datF$suppressedA[GaussSuppression(x, primary = is.na(datF$primary), singleton = df$values == 1)] <- NA
+f <- rownames(datF[datF$values >1 ,])#& datF$values > 0,])
+datF$suppressedA[GaussSuppression(x, candidates = f, primary = is.na(datF$primary), singleton = df$values == 1) ] <- NA
 # with singleton
 datF3$values <- datF$suppressedA
 datF3 <- datF3 %>% 
