@@ -3,8 +3,8 @@
 
 
 rm(list=ls())
-install.packages("GaussSuppression")
-install.packages("pandas.DataFrame")
+#install.packages("GaussSuppression")
+i#nstall.packages("pandas.DataFrame")
 library(SSBtools)
 library(GaussSuppression)
 library(dplyr)

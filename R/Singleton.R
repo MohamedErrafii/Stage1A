@@ -5,14 +5,14 @@ library(tidyverse)
 library(curl)
 library(readxl)
 
-rm(list=ls())rhvihzo
+rm(list=ls())
 
 
 
 #######################################################################################################################################################################################################
 #Exemple donnée avec la doc de la fonction GaussSuppression
 # Input data
-df <- data.frame(values = c(1, 1, 1, 5, 5, 9, 9, 9, 9, 9, 0, 0, 0, 7, 7), 
+df <- data.frame(values = c(2, 2, 2, 5, 5, 9, 9, 9, 9, 9, 0, 0, 0, 7, 7), 
                  var1 = rep(1:3, each = 5), 
                  var2 = c("A", "B", "C", "D", "E"), stringsAsFactors = FALSE)
 
@@ -66,6 +66,8 @@ datF3
 
 
 
+
+
 #######################################################################################################################################################################################################
 #Exemple simple 1."
 df <- data.frame(values = c(8, 4, 1, 7), 
@@ -104,7 +106,7 @@ datF3
 
 #######################################################################################################################################################################################################
 #Exemple simple 2."
-df <- data.frame(values = c(8, 12, 8, 5, 1, 7, 25, 6, 9), 
+df <- data.frame(values = c(8, 12, 8, 5, 2, 7, 25, 6, 9), 
                  var1 = c("CAP", "BAC","Master", "CAP", "BAC","Master","CAP", "BAC","Master"), 
                  var2 = c("<20", "<20", "<20", "20~30", "20~30", "20~30", ">30", ">30", ">30"), stringsAsFactors = FALSE)
 
@@ -116,17 +118,15 @@ datF3 <- datF
 
 # Add primary suppression 
 datF$primary <- datF$values
-datF$primary[datF$values < 2 & datF$values > 0] <- NA
+datF$primary[datF$values < 3 & datF$values > 0] <- NA
 datF$suppressedA <- datF$primary
 
 # with singleton
-datF$suppressedA[GaussSuppression(x, c(which(datF$values == 0), which(datF$values > 0)), 
-                                  
-                                  primary = is.na(datF$primary), singleton = df$values == 1)] <- NA
-# with singleton
+f <- rownames(datF[datF$values >15 ,])#& datF$values > 0,])
+datF$suppressedA[GaussSuppression(x, c(which(datF$values == 0), which(datF$values > 0)),primary = is.na(datF$primary), hidden = f)]
 datF3$values <- datF$suppressedA
 datF3 <- datF3 %>% 
-  pivot_wider(names_from = 'var2', values_from = 'values')
+  pivot_wider(names_from = 'var1', values_from = 'values')
 datF3
 ####### END exemple 3 #################################################################################################################################################################################
 
