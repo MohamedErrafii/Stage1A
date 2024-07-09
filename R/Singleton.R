@@ -10,9 +10,9 @@ rm(list=ls())
 
 
 #######################################################################################################################################################################################################
-#Exemple donnée avec la doc de la fonction GaussSuppression
+#Exemple donnée avec la doc de la fonction GaussSuppression #faire varier les valeurs # feuilleter les papiers #regarder la doc 
 # Input data
-df <- data.frame(values = c(2, 2, 2, 5, 5, 9, 9, 9, 9, 9, 0, 0, 0, 7, 7), 
+df <- data.frame(values = c(1, 1, 1, 5, 5, 9, 9, 9, 9, 9, 0, 0, 0, 7, 7), 
                  var1 = rep(1:3, each = 5), 
                  var2 = c("A", "B", "C", "D", "E"), stringsAsFactors = FALSE)
 
@@ -34,11 +34,11 @@ datF$suppressedC <- datF$primary
 # zero secondary suppressed
 datF$suppressedA[GaussSuppression(x, primary = is.na(datF$primary))] <- NA
 
-# zero not secondary suppressed by first in ordering
+# zero not secondary suppressed by first in ordering  (faire un exemple où il est obligé de toucher à des zéros et voir si il le fait quand même )
 datF$suppressedB[GaussSuppression(x, c(which(datF$values == 0), which(datF$values > 0)), 
                                   primary = is.na(datF$primary))] <- NA
 
-# with singleton
+# with singleton # (comprendre comment la méthode du singleton fonctionne  et revoir les paiers pour voir si ils en parlent) 
 datF$suppressedC[GaussSuppression(x, c(which(datF$values == 0), which(datF$values > 0)), 
 
                                                                     primary = is.na(datF$primary), singleton = df$values == 1)] <- NA
@@ -69,7 +69,7 @@ datF3
 
 
 #######################################################################################################################################################################################################
-#Exemple simple 1."
+#Exemple simple 1." #construire une colonne "expected" et la comparer pour que ce soit plus visuelle 
 df <- data.frame(values = c(8, 4, 1, 7), 
                  var1 = c("CAP", "BAC", "CAP", "BAC"), 
                  var2 = c("H", "H", "F", "F"), stringsAsFactors = FALSE)
@@ -123,7 +123,8 @@ datF$suppressedA <- datF$primary
 
 # with singleton
 f <- rownames(datF[datF$values >15 ,])#& datF$values > 0,])
-datF$suppressedA[GaussSuppression(x, c(which(datF$values == 0), which(datF$values > 0)),primary = is.na(datF$primary), hidden = f)]
+f
+datF$suppressedA[GaussSuppression(x, c(which(datF$values == 0), which(datF$values > 0)),primary = is.na(datF$primary), hidden = f)] #reutiliser le code où pn met les zéros en premier et mettre les cellule cacher ern dernier 
 datF3$values <- datF$suppressedA
 datF3 <- datF3 %>% 
   pivot_wider(names_from = 'var1', values_from = 'values')

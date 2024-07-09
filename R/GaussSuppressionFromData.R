@@ -1,0 +1,1 @@
+# Pour chaque pb regarder comment il s'écrie avec GaussSuppressionFromData

@@ -1,0 +1,1 @@
+#hierarchy comment lui signaler la hierarchcy  # regarder model matrix et hierarchy2modelmatrix pour commencer 
