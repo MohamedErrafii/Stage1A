@@ -112,19 +112,33 @@ df2 <- GaussSuppressionFromData(df, freqVar = "values", hierarchies = list(var1 
 
 # First, create different types of input
 z <- SSBtoolsData("sprt_emp_withEU")
+z
 yearFormula <- c("y_14 = 2014", "y_15_16 = y_all - y_14", "y_all = 2014 + 2015 + 2016")
+yearFormula
 yearHier <- Formula2Hierarchy(yearFormula)
-geoDimList <- FindDimLists(z[, c("geo", "eu")], total = "Europe")[[1]]
+yearHier
+geoDimList <- FindDimLists(z[, c("eu","geo")], total = "Europe")[[1]]
+geoDimList
 geoDimList2 <- FindDimLists(z[, c("geo", "eu")])[[1]]
+geoDimList2
 geoHrc <- DimList2Hrc(geoDimList)
+geoHrc
 ageHier <- SSBtoolsData("sprt_emp_ageHier")
+ageHier
 
 h1 <- AutoHierarchies(list(age = ageHier, geo = geoDimList, year = yearFormula))
+h1
+
 h2 <- AutoHierarchies(list(age = "Y15-64", geo = geoHrc, year = yearHier), data = z, 
                       total = "Europe")
+h2
+
 h3 <- AutoHierarchies(list(age = "Total", geo = geoDimList2, year = "Total"), data = z)
+h3
 h4 <- FindHierarchies(z[, c(1, 2, 3, 5)])
+h4
 h5 <- AutoHierarchies(list(age = "Total", geo = "", year = "colFactor"), data = z)
+h5
 identical(h1, h2)
 identical(h3, h4)
 
@@ -133,8 +147,8 @@ h1 # = h2
 h3 # = h4
 h5
 
-FindHierarchies(z[, c("geo", "eu", "age")])
-
+a<-FindHierarchies(z[, c("geo", "eu", "age")])
+a
 
 # ===================================================================== 
 #   Examples illustrating the combineHierarchies parameter
