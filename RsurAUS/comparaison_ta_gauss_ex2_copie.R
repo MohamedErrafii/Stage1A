@@ -568,7 +568,7 @@ merged_data_visuel <- merged_data[,c("ACTIVITY","CJ","N_OBS")] %>%
 merged_data_visuel
 
 
-filtered_data3_gauss <- filtered_data2_gauss %>% 
+SSfiltered_data3_gauss <- filtered_data2_gauss %>% 
   group_by(primary,suppressed) %>% 
   summarise(
     ncell = n(),
@@ -710,6 +710,12 @@ merged_data_diff
 # cf le document qui essaye dexpliquer les didfférences sur les 3 subsectionsBE ; GI ; MN
 
 
+#Comparaison des deux masques
+
+#lignes en plus de gausssuppression 
+
+lignes_en_plus <- anti_join(masq_gauss, masq_ta, by = c("ACTIVITY", "CJ"))
+lignes_en_plus
 
 
 
