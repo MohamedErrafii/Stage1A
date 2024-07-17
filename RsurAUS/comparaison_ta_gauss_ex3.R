@@ -63,7 +63,7 @@ hrc_file_activity <- write_hrc2(
 )
 
 masq_ta <- tab_rtauargus(
-  tab_ex2,
+  tab_ex2 %>% select(-TOT),
   dir_name = "tauargus_files/ex2",
   files_name = "ex2",
   explanatory_vars = c("ACTIVITY","SIZE"), #equivalent de DimVar
@@ -204,10 +204,10 @@ merged_data_visuel
 merged_data_diff<-merged_data[merged_data$Same == FALSE,]
 merged_data_diff
 
-#Pour E
+#Pour BE
 
 #Pour GaussSuppression
-filtered_data <- a_filtrer[grepl("E", a_filtrer$A21), ]
+filtered_data <- a_filtrer[grepl("BE", a_filtrer$A10), ]
 flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
@@ -215,7 +215,7 @@ filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
 print(filtered_data2_gauss)
 
 #Pour Tau-Argus
-filtered_data <- a_filtrer[grepl("E", a_filtrer$A21), ]
+filtered_data <- a_filtrer[grepl("BE", a_filtrer$A10), ]
 flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
@@ -226,6 +226,170 @@ merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIV
 merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
 merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
 print(merged_data)
+merged_data_visuel <- merged_data[,c("ACTIVITY","SIZE","N_OBS")] %>% 
+  pivot_wider(names_from = "ACTIVITY", values_from = 'N_OBS')
+
+print(merged_data_visuel,width = 300)
+merged_data_visuel <- merged_data_visuel %>% 
+  select(-C,C)
+merged_data_visuel <- merged_data_visuel %>% 
+  select(-BE,BE)
+merged_data_visuel<-merged_data_visuel[c(2:nrow(merged_data_visuel),1),]
+print(merged_data_visuel, width =300)
+
+
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+filtered_data2_gauss %>% 
+  group_by(primary,suppressed) %>% 
+  summarise(
+    ncell = n(),
+    valcell = sum(N_OBS)
+  )
+
+filtered_data2_ta %>% 
+  group_by(is_secret_prim,is_secret = Status!="V") %>% 
+  summarise(
+    ncell = n(),
+    valcell = sum(N_OBS)
+  )
+lignes_en_plus <- anti_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY", "SIZE"))
+lignes_en_plus
+
+#On remarque une différence dans la subdivision C donc on va regarder pour voir pourquoi il y a de tel différence 
+
+#Pour C
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("C", a_filtrer$A21), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("C", a_filtrer$A21), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2_ta)
+# masq_ta_C <- tab_rtauargus(
+#   filtered_data2_ta %>% filter(ACTIVITY != "BE"),
+#   dir_name = "tauargus_files/ex2",
+#   files_name = "ex2",
+#   explanatory_vars = c("ACTIVITY","SIZE"), #equivalent de DimVar
+#   value = "N_OBS",
+#   freq = "N_OBS", #freqVAR
+#   secret_var = "is_secret_prim",
+#   hrc = c(ACTIVITY = hrc_file_activity),
+#   totcode = c(ACTIVITY="C",SIZE="Total"),
+#   suppress = "MOD(1,5,0,0,0)"
+# )
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+
+merged_data_visuel <- merged_data[,c("ACTIVITY","SIZE","N_OBS")] %>% 
+  pivot_wider(names_from = "ACTIVITY", values_from = 'N_OBS')
+merged_data_visuel <- merged_data_visuel %>% 
+  select(-C,C)
+merged_data_visuel <- merged_data_visuel %>% 
+  select(-BE,BE)
+merged_data_visuel<-merged_data_visuel[c(2:nrow(merged_data_visuel),1),]
+print(merged_data_visuel, width =300)
+
+
+
+#cf cahier pour les commentaires sur les différence du secret secondaire 
+
+
+#Pour FZ
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("FZ", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("FZ", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+#le sous tableau  concernant la catégorie FZ est la même 
+
+
+#Pour GI
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("GI", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("GI", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+# il y a des différences pour les subsections H et I on va regarder ça de plus près 
+
+#Pour H 
+
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("H", a_filtrer$A21), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("H", a_filtrer$A21), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
 
 merged_data_visuel <- merged_data[,c("ACTIVITY","SIZE","N_OBS")] %>% 
   pivot_wider(names_from = "ACTIVITY", values_from = 'N_OBS')
@@ -233,6 +397,382 @@ merged_data_visuel <- merged_data[,c("ACTIVITY","SIZE","N_OBS")] %>%
 merged_data_visuel
 
 
+filtered_data3_gauss <- filtered_data2_gauss %>% 
+  group_by(primary,suppressed) %>% 
+  summarise(
+    ncell = n(),
+    valcell = sum(N_OBS)
+  )
+filtered_data3_gauss <- filtered_data3_gauss[2:3,]
+filtered_data3_gauss
+
+
+filtered_data3_ta <- filtered_data2_ta %>% 
+  group_by(is_secret_prim,is_secret = Status!="V") %>% 
+  summarise(
+    ncell = n(),
+    valcell = sum(N_OBS)
+  )
+filtered_data3_ta <- filtered_data3_ta[2:3,]
+filtered_data3_ta
+
+
+
+
+#Pour I
+
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("I", a_filtrer$A21), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("I", a_filtrer$A21), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
 merged_data_diff<-merged_data[merged_data$Same == FALSE,]
 merged_data_diff
 
+merged_data_visuel <- merged_data[,c("ACTIVITY","SIZE","N_OBS")] %>% 
+  pivot_wider(names_from = "ACTIVITY", values_from = 'N_OBS')
+
+merged_data_visuel
+
+
+filtered_data3_gauss <- filtered_data2_gauss %>% 
+  group_by(primary,suppressed) %>% 
+  summarise(
+    ncell = n(),
+    valcell = sum(N_OBS)
+  )
+filtered_data3_gauss <- filtered_data3_gauss[2:3,]
+filtered_data3_gauss
+
+
+filtered_data3_ta <- filtered_data2_ta %>% 
+  group_by(is_secret_prim,is_secret = Status!="V") %>% 
+  summarise(
+    ncell = n(),
+    valcell = sum(N_OBS)
+  )
+filtered_data3_ta <- filtered_data3_ta[2:3,]
+filtered_data3_ta
+
+
+#Pour JZ
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("JZ", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("JZ", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+#Le secret est posé de la même manière sur la section JZ
+
+
+
+
+#Pour KZ
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("KZ", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("KZ", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+
+#Le secret est posé de la même manière sur la section KZ
+
+#Pour LZ
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("LZ", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("LZ", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+
+#Le secret est posé de la même manière sur la section LZ
+
+
+
+
+
+#Pour MN
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("MN", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("MN", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+
+#On a des différences sur les sections sur les sections M et N, regardons de plus près 
+
+
+# M 
+
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("M", a_filtrer$A21), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("M", a_filtrer$A21), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+merged_data_visuel <- merged_data[,c("ACTIVITY","SIZE","N_OBS")] %>% 
+  pivot_wider(names_from = "ACTIVITY", values_from = 'N_OBS')
+
+merged_data_visuel
+
+
+SSfiltered_data3_gauss <- filtered_data2_gauss %>% 
+  group_by(primary,suppressed) %>% 
+  summarise(
+    ncell = n(),
+    valcell = sum(N_OBS)
+  )
+filtered_data3_gauss <- filtered_data3_gauss[2:3,]
+filtered_data3_gauss
+
+
+filtered_data3_ta <- filtered_data2_ta %>% 
+  group_by(is_secret_prim,is_secret = Status!="V") %>% 
+  summarise(
+    ncell = n(),
+    valcell = sum(N_OBS)
+  )
+filtered_data3_ta <- filtered_data3_ta[2:3,]
+filtered_data3_ta
+
+
+
+
+# N 
+
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("N", a_filtrer$A21), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("N", a_filtrer$A21), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+merged_data_visuel <- merged_data[,c("ACTIVITY","SIZE","N_OBS")] %>% 
+  pivot_wider(names_from = "ACTIVITY", values_from = 'N_OBS')
+
+merged_data_visuel
+
+
+filtered_data3_gauss <- filtered_data2_gauss %>% 
+  group_by(primary,suppressed) %>% 
+  summarise(
+    ncell = n(),
+    valcell = sum(N_OBS)
+  )
+filtered_data3_gauss <- filtered_data3_gauss[2:3,]
+filtered_data3_gauss
+
+
+filtered_data3_ta <- filtered_data2_ta %>% 
+  group_by(is_secret_prim,is_secret = Status!="V") %>% 
+  summarise(
+    ncell = n(),
+    valcell = sum(N_OBS)
+  )
+filtered_data3_ta <- filtered_data3_ta[2:3,]
+filtered_data3_ta
+
+
+
+#Pour OQ
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("OQ", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("OQ", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+#Le masque de la sous table OQ  est le même 
+
+
+
+
+
+#Pour RU
+
+#Pour GaussSuppression
+filtered_data <- a_filtrer[grepl("RU", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("RU", a_filtrer$A10), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
+print(filtered_data2)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","SIZE","N_OBS"))
+merged_data <- merged_data[,c("ACTIVITY","SIZE","N_OBS","Status_Gauss","Status")]
+merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
+print(merged_data)
+merged_data_diff<-merged_data[merged_data$Same == FALSE,]
+merged_data_diff
+
+#Le masque de la sous table RU  est le même 
+
+# Conclusion : le masque est différent uiquement pour les subdivisions BE ; GI ; MN
+# Sur BE : même nombre de cellule elemine mais "+38" en terme de valeur pour GaussSuppression (donc tau-Argus fais mieux dans tout les points)
+# Sur GI : "+2" en terme de cellule mais "-1567" en terme de valeur pour GaussSuppression ( donc tau-Argus est meilleur pour minimiser le nombre de case mais GaussSuppression est meilleur pour minimiser la valeur des cellules )
+# Sur MN : "+3" en terme de cellule et "+401" en terme de valeur pour GaussSuppression ((donc tau-Argus fais mieux dans tout les points))
+
+# Bilan : "+5" en terme de cellule mais "-1128" en terme de valeur pour GaussSuppression  ( donc tau-Argus est meilleur pour minimiser le nombre de case mais GaussSuppression est meilleur pour minimiser la valeur des cellules )
+# cf le document qui essaye dexpliquer les didfférences sur les 3 subsectionsBE ; GI ; MN
+
+
+#Comparaison des deux masques
+
+#lignes en plus de gausssuppression 
+
+lignes_en_plus <- anti_join(masq_gauss, masq_ta, by = c("ACTIVITY", "SIZE"))
+lignes_en_plus
+
+
+turnover_act_size %>% 
+  group_by(ACTIVITY) %>% 
+  summarise(moy = mean(TOT), freq = sum(N_OBS)) %>% 
+  knitr::kable(format = "latex", digits = 1)

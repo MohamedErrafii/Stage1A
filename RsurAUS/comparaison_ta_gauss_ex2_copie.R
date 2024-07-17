@@ -229,7 +229,7 @@ flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
 filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
-print(filtered_data2)
+print(filtered_data2_gauss)
 
 #Pour Tau-Argus
 filtered_data <- a_filtrer[grepl("E", a_filtrer$A21), ]
@@ -237,15 +237,15 @@ flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
 filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
-print(filtered_data2)
+print(filtered_data2_ta)
 
 merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","CJ","N_OBS"))
-merged_data <- merged_data[,c("ACTIVITY","CJ","N_OBS","Status_Gauss","Status")]
+merged_data <- merged_data[,c("ACTIVITY","CJ","N_OBS","Status_Gauss","Status","TOT")]
 merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
 print(merged_data)
 
-merged_data_visuel <- merged_data[,c("ACTIVITY","CJ","N_OBS")] %>% 
-  pivot_wider(names_from = "ACTIVITY", values_from = 'N_OBS')
+merged_data_visuel <- merged_data[,c("ACTIVITY","CJ","TOT")] %>% 
+  pivot_wider(names_from = "ACTIVITY", values_from = 'TOT')
 
 merged_data_visuel
 
