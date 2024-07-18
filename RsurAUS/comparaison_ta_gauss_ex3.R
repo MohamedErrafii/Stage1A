@@ -79,28 +79,94 @@ masq_ta <- tab_rtauargus(
 # B = secret primaire
 
 # Comparaison --------------------------------
-masq_gauss %>% count(suppressed)
-masq_ta %>% count(Status!="V")
+comparaison_deux_masque <-function(masq1,masq2) {
+  Stat_masq_Gauss<-masq1 %>% 
+    group_by(primary,suppressed) %>% 
+    summarise(
+      ncell_Gauss = n(),
+      valcell_Gauss = sum(N_OBS)
+    )
+  Stat_masq_Gauss<-Stat_masq_Gauss %>% 
+    mutate(Status_Gauss = case_when(
+      primary ~ "B",
+      suppressed ~"D",
+      TRUE ~ "V"
+    ))
+  Stat_masq_Gauss <- Stat_masq_Gauss[,(ncol(Stat_masq_Gauss)-2):ncol(Stat_masq_Gauss)]
+  sums <- colSums(Stat_masq_Gauss[,1:2])
+  Stat_masq_Gauss[,1]<-(Stat_masq_Gauss[,1]*100)/sums[1]
+  Stat_masq_Gauss[,2]<-(Stat_masq_Gauss[,2]*100)/sums[2]
+  Stat_masq_Gauss <- Stat_masq_Gauss %>%
+    mutate(across(where(is.numeric), ~ round(., 2)))
+  sums <- c(sums,"Total")
+  Stat_masq_Gauss <- rbind(Stat_masq_Gauss,sums)
+  Stat_masq_Gauss <- Stat_masq_Gauss %>%
+    select(Status_Gauss, everything())
+  Stat_masq_Gauss
+  
+  
+  #Stat sur le masq de tau-argus
+  
+  Stat_masq_tau<- masq2 %>% 
+    group_by(is_secret_prim,is_secret = Status!="V") %>% 
+    summarise(
+      ncell_tau = n(),
+      valcell_tau = sum(N_OBS)
+    )
+  Stat_masq_tau<-Stat_masq_tau %>% 
+    mutate(Status_tau = case_when(
+      is_secret_prim ~ "B",
+      is_secret ~"D",
+      TRUE ~ "V"
+    ))
+  
+  Stat_masq_tau
+  Stat_masq_tau <- Stat_masq_tau[,(ncol(Stat_masq_tau)-2):ncol(Stat_masq_tau)]
+  sums <- colSums(Stat_masq_tau[,1:2])
+  Stat_masq_tau[,1]<-(Stat_masq_tau[,1]*100)/sums[1]
+  Stat_masq_tau[,2]<-(Stat_masq_tau[,2]*100)/sums[2]
+  Stat_masq_tau <- Stat_masq_tau %>%
+    mutate(across(where(is.numeric), ~ round(., 2)))
+  sums <- c(sums,"Total")
+  Stat_masq_tau <- rbind(Stat_masq_tau,sums)
+  Stat_masq_tau <- Stat_masq_tau %>%
+    select(Status_tau, everything())
+  Stat_masq_tau
+  
+  Stat_tot <- cbind(Stat_masq_Gauss,Stat_masq_tau)
+  Stat_tot <- Stat_tot[,-4]
+  colnames(Stat_tot)[1] <- "Status"
+  Stat_tot <- Stat_tot[, c(1, 2, 4, 3,5)]
+  print(Stat_tot)
+  Stat_tot %>% knitr::kable(format = "latex", digits = 1)
+}
 
-masq_gauss %>% 
-  group_by(primary,suppressed) %>% 
-  summarise(
-    ncell = n(),
-    valcell = sum(N_OBS)
-  )
+#Tout d'abors on va regarder ces lignes en  plus : 
+#lignes en plus de gausssuppression 
 
-masq_ta %>% 
-  group_by(is_secret_prim,is_secret = Status!="V") %>% 
-  summarise(
-    ncell = n(),
-    valcell = sum(N_OBS)
-  )
+lignes_en_plus <- anti_join(masq_gauss, masq_ta, by = c("ACTIVITY", "SIZE"))
+lignes_en_plus
 
+#on va, au cas où (mais normalement ce n'est pas le cas), si GaussSuppression a poser du secret 
+#sur ces zéros
 
+contient_SP <- any(lignes_en_plus[,ncol(lignes_en_plus)] == TRUE)
+contient_SP
 
+#si contient_SP est FALSE alors GaussSuppression n'a pas posé de secret sur ces zéros on 
+#peut donc les supprimer 
 
+masq_gauss <- anti_join(masq_gauss, lignes_en_plus, by = c("ACTIVITY", "SIZE") )
 
+#on vérifie que le masque de gausssuppression et le masque de tau-argus peuvent être comparer 
+#(i.e on le même nombre de lignes) 
 
+lignes_en_plus <- anti_join(masq_gauss, masq_ta, by = c("ACTIVITY", "SIZE"))
+lignes_en_plus
+
+#Si lignes_en_plus contient 0 lignes on peut maintenant faire les statisques sur les différents masques
+
+comparaison_deux_masque(masq_gauss,masq_ta)
 masq_gauss %>% 
   mutate(Status_Gauss = case_when(
     primary ~ "B",
@@ -171,6 +237,8 @@ masq_gauss <- masq_gauss %>%
     primary ~ "B",
     suppressed ~"D",
     TRUE ~ "V"))
+
+
 
 #####################################################
 #Pour AZ
@@ -256,7 +324,7 @@ filtered_data2_ta %>%
   )
 lignes_en_plus <- anti_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY", "SIZE"))
 lignes_en_plus
-
+comparaison_deux_masque(filtered_data2_gauss,filtered_data2_ta)
 #On remarque une différence dans la subdivision C donc on va regarder pour voir pourquoi il y a de tel différence 
 
 #Pour C
@@ -294,7 +362,7 @@ merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
 print(merged_data)
 merged_data_diff<-merged_data[merged_data$Same == FALSE,]
 merged_data_diff
-
+comparaison_deux_masque(filtered_data2_gauss,filtered_data2_ta)
 
 merged_data_visuel <- merged_data[,c("ACTIVITY","SIZE","N_OBS")] %>% 
   pivot_wider(names_from = "ACTIVITY", values_from = 'N_OBS')

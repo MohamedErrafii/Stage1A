@@ -13,6 +13,7 @@ library(SSBtools)
 library(tidyverse)
 library(curl)
 library(readxl)
+library(tibble)
 
 loc_tauargus <- "Y:/Logiciels/TauArgus/TauArgus_4.2.5.TEST/TauArgus.exe"
 options(rtauargus.tauargus_exe = loc_tauargus)
@@ -77,29 +78,101 @@ masq_ta <- tab_rtauargus(
 # V = cellule valide
 # D = Secret secondaire
 # B = secret primaire
+# On va enlever des zéros du masque de GaussSuppression pour comparer le même nombre de cellule
+# chez gauss et tau-Argus 
+
+#Tout d'abors on va regarder ces lignes en  plus : 
+#lignes en plus de gausssuppression 
+
+lignes_en_plus <- anti_join(masq_gauss, masq_ta, by = c("ACTIVITY", "CJ"))
+lignes_en_plus
+
+#on va, au cas où (mais normalement ce n'est pas le cas), si GaussSuppression a poser du secret 
+#sur ces zéros
+
+contient_SP <- any(lignes_en_plus[,ncol(lignes_en_plus)] == TRUE)
+contient_SP
+
+#si contient_SP est FALSE alors GaussSuppression n'a pas posé de secret sur ces zéros on 
+#peut donc les supprimer 
+
+masq_gauss <- anti_join(masq_gauss, lignes_en_plus, by = c("ACTIVITY", "CJ") )
+
+#on vérifie que le masque de gausssuppression et le masque de tau-argus peuvent être comparer 
+#(i.e on le même nombre de lignes) 
+
+lignes_en_plus <- anti_join(masq_gauss, masq_ta, by = c("ACTIVITY", "CJ"))
+lignes_en_plus
+
+#Si lignes_en_plus contient 0 lignes on peut maintenant faire les statisques sur les différents masques
 
 # Comparaison --------------------------------
-masq_gauss %>% count(suppressed)
-masq_ta %>% count(Status!="V")
 
-masq_gauss %>% 
-  group_by(primary,suppressed) %>% 
-  summarise(
-    ncell = n(),
-    valcell = sum(N_OBS)
-  )
+#Stat sur le masq de gauss suppression
 
-masq_ta %>% 
-  group_by(is_secret_prim,is_secret = Status!="V") %>% 
-  summarise(
-    ncell = n(),
-    valcell = sum(N_OBS)
-  )
+comparaison_deux_masque <-function(masq1,masq2) {
+  Stat_masq_Gauss<-masq1 %>% 
+    group_by(primary,suppressed) %>% 
+    summarise(
+      ncell_Gauss = n(),
+      valcell_Gauss = sum(N_OBS)
+    )
+  Stat_masq_Gauss<-Stat_masq_Gauss %>% 
+    mutate(Status_Gauss = case_when(
+      primary ~ "B",
+      suppressed ~"D",
+      TRUE ~ "V"
+    ))
+  Stat_masq_Gauss <- Stat_masq_Gauss[,(ncol(Stat_masq_Gauss)-2):ncol(Stat_masq_Gauss)]
+  sums <- colSums(Stat_masq_Gauss[,1:2])
+  Stat_masq_Gauss[,1]<-(Stat_masq_Gauss[,1]*100)/sums[1]
+  Stat_masq_Gauss[,2]<-(Stat_masq_Gauss[,2]*100)/sums[2]
+  Stat_masq_Gauss <- Stat_masq_Gauss %>%
+    mutate(across(where(is.numeric), ~ round(., 2)))
+  sums <- c(sums,"Total")
+  Stat_masq_Gauss <- rbind(Stat_masq_Gauss,sums)
+  Stat_masq_Gauss <- Stat_masq_Gauss %>%
+    select(Status_Gauss, everything())
+  Stat_masq_Gauss
+  
+  
+  #Stat sur le masq de tau-argus
+  
+  Stat_masq_tau<- masq2 %>% 
+    group_by(is_secret_prim,is_secret = Status!="V") %>% 
+    summarise(
+      ncell_tau = n(),
+      valcell_tau = sum(N_OBS)
+    )
+  Stat_masq_tau<-Stat_masq_tau %>% 
+    mutate(Status_tau = case_when(
+      is_secret_prim ~ "B",
+      is_secret ~"D",
+      TRUE ~ "V"
+    ))
+  
+  Stat_masq_tau
+  Stat_masq_tau <- Stat_masq_tau[,(ncol(Stat_masq_tau)-2):ncol(Stat_masq_tau)]
+  sums <- colSums(Stat_masq_tau[,1:2])
+  Stat_masq_tau[,1]<-(Stat_masq_tau[,1]*100)/sums[1]
+  Stat_masq_tau[,2]<-(Stat_masq_tau[,2]*100)/sums[2]
+  Stat_masq_tau <- Stat_masq_tau %>%
+    mutate(across(where(is.numeric), ~ round(., 2)))
+  sums <- c(sums,"Total")
+  Stat_masq_tau <- rbind(Stat_masq_tau,sums)
+  Stat_masq_tau <- Stat_masq_tau %>%
+    select(Status_tau, everything())
+  Stat_masq_tau
+  
+  Stat_tot <- cbind(Stat_masq_Gauss,Stat_masq_tau)
+  Stat_tot <- Stat_tot[,-4]
+  colnames(Stat_tot)[1] <- "Status"
+  Stat_tot <- Stat_tot[, c(1, 2, 4, 3,5)]
+  print(Stat_tot)
+  Stat_tot %>% knitr::kable(format = "latex", digits = 1)
+}
 
-
-
-
-
+comparaison_deux_masque(masq_gauss,masq_ta)
 
 masq_gauss %>% 
   mutate(Status_Gauss = case_when(
@@ -117,6 +190,8 @@ masq_gauss %>%
   ) %>% 
   mutate(diff_status = Status_Gauss != Status) %>% 
   filter(diff_status)
+
+
 # Tableau bcp trop grand pour poser le secret à la main
 # data <- as.data.frame(turnover_act_cj)
 # datF <- data %>% 
@@ -204,7 +279,7 @@ flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
 filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
-print(filtered_data2)
+print(filtered_data2_gauss)
 
 #Pour Tau-Argus
 filtered_data <- a_filtrer[grepl("BE", a_filtrer$A10), ]
@@ -212,12 +287,13 @@ flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
 filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
-print(filtered_data2)
+print(filtered_data2_ta)
 
 merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","CJ","N_OBS"))
 merged_data <- merged_data[,c("ACTIVITY","CJ","N_OBS","Status_Gauss","Status")]
 merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
 print(merged_data)
+comparaison_deux_masque(filtered_data2_gauss,filtered_data2_ta)
 
 #On remarque une différence dans la subdivision E donc on va regarder pour voir pourquoi il y a de tel différence 
 
@@ -252,6 +328,7 @@ merged_data_visuel
 
 merged_data_diff<-merged_data[merged_data$Same == FALSE,]
 merged_data_diff
+comparaison_deux_masque(filtered_data2_gauss,filtered_data2_ta)
 
 #cf cahier pour les commentaires sur les différence du secret secondaire 
 
@@ -264,7 +341,7 @@ flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
 filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
-print(filtered_data2)
+print(filtered_data2_gauss)
 
 #Pour Tau-Argus
 filtered_data <- a_filtrer[grepl("FZ", a_filtrer$A10), ]
@@ -272,7 +349,7 @@ flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
 filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
-print(filtered_data2)
+print(filtered_data2_ta)
 
 merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","CJ","N_OBS"))
 merged_data <- merged_data[,c("ACTIVITY","CJ","N_OBS","Status_Gauss","Status")]
@@ -292,7 +369,7 @@ flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
 filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
-print(filtered_data2)
+print(filtered_data2_gauss)
 
 #Pour Tau-Argus
 filtered_data <- a_filtrer[grepl("GI", a_filtrer$A10), ]
@@ -300,7 +377,7 @@ flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
 filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
-print(filtered_data2)
+print(filtered_data2_ta)
 
 merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","CJ","N_OBS"))
 merged_data <- merged_data[,c("ACTIVITY","CJ","N_OBS","Status_Gauss","Status")]
@@ -308,7 +385,7 @@ merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
 print(merged_data)
 merged_data_diff<-merged_data[merged_data$Same == FALSE,]
 merged_data_diff
-
+comparaison_deux_masque(filtered_data2_gauss,filtered_data2_ta)
 # il y a des différences pour les subsections H et I on va regarder ça de plus près 
 
 #Pour H 
@@ -363,7 +440,7 @@ filtered_data3_ta <- filtered_data3_ta[2:3,]
 filtered_data3_ta
 
 
-
+comparaison_deux_masque(filtered_data2_gauss,filtered_data2_ta)
 
 #Pour I
 
@@ -415,7 +492,7 @@ filtered_data3_ta <- filtered_data2_ta %>%
   )
 filtered_data3_ta <- filtered_data3_ta[2:3,]
 filtered_data3_ta
-
+comparaison_deux_masque(filtered_data2_gauss,filtered_data2_ta)
 
 #Pour JZ
 
@@ -425,7 +502,7 @@ flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
 filtered_data2_gauss <- subset(masq_gauss, ACTIVITY %in% unique_cells)
-print(filtered_data2)
+print(filtered_data2_gauss)
 
 #Pour Tau-Argus
 filtered_data <- a_filtrer[grepl("JZ", a_filtrer$A10), ]
@@ -433,7 +510,7 @@ flattened_data <- c(as.matrix(filtered_data))
 unique_cells <- unique(flattened_data)
 print(unique_cells)
 filtered_data2_ta <- subset(masq_ta, ACTIVITY %in% unique_cells)
-print(filtered_data2)
+print(filtered_data2_ta)
 
 merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("ACTIVITY","CJ","N_OBS"))
 merged_data <- merged_data[,c("ACTIVITY","CJ","N_OBS","Status_Gauss","Status")]
@@ -531,7 +608,7 @@ merged_data$Same<- merged_data$Status == merged_data$Status_Gauss
 print(merged_data)
 merged_data_diff<-merged_data[merged_data$Same == FALSE,]
 merged_data_diff
-
+comparaison_deux_masque(filtered_data2_gauss,filtered_data2_ta)
 
 #On a des différences sur les sections sur les sections M et N, regardons de plus près 
 
@@ -588,6 +665,7 @@ filtered_data3_ta <- filtered_data3_ta[2:3,]
 filtered_data3_ta
 
 
+comparaison_deux_masque(filtered_data2_gauss,filtered_data2_ta)
 
 
 # N 
@@ -640,6 +718,7 @@ filtered_data3_ta <- filtered_data2_ta %>%
   )
 filtered_data3_ta <- filtered_data3_ta[2:3,]
 filtered_data3_ta
+comparaison_deux_masque(filtered_data2_gauss,filtered_data2_ta)
 
 
 
