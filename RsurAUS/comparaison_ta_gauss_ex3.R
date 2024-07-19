@@ -14,6 +14,8 @@ library(tidyverse)
 library(curl)
 library(readxl)
 
+source("RsurAUS/fonction_comparaison_masque.R")
+
 loc_tauargus <- "Y:/Logiciels/TauArgus/TauArgus_4.2.5.TEST/TauArgus.exe"
 options(rtauargus.tauargus_exe = loc_tauargus)
 
@@ -78,69 +80,38 @@ masq_ta <- tab_rtauargus(
 # D = Secret secondaire
 # B = secret primaire
 
-# Comparaison --------------------------------
-comparaison_deux_masque <-function(masq1,masq2) {
-  Stat_masq_Gauss<-masq1 %>% 
-    group_by(primary,suppressed) %>% 
-    summarise(
-      ncell_Gauss = n(),
-      valcell_Gauss = sum(N_OBS)
-    )
-  Stat_masq_Gauss<-Stat_masq_Gauss %>% 
-    mutate(Status_Gauss = case_when(
-      primary ~ "B",
-      suppressed ~"D",
-      TRUE ~ "V"
-    ))
-  Stat_masq_Gauss <- Stat_masq_Gauss[,(ncol(Stat_masq_Gauss)-2):ncol(Stat_masq_Gauss)]
-  sums <- colSums(Stat_masq_Gauss[,1:2])
-  Stat_masq_Gauss[,1]<-(Stat_masq_Gauss[,1]*100)/sums[1]
-  Stat_masq_Gauss[,2]<-(Stat_masq_Gauss[,2]*100)/sums[2]
-  Stat_masq_Gauss <- Stat_masq_Gauss %>%
-    mutate(across(where(is.numeric), ~ round(., 2)))
-  sums <- c(sums,"Total")
-  Stat_masq_Gauss <- rbind(Stat_masq_Gauss,sums)
-  Stat_masq_Gauss <- Stat_masq_Gauss %>%
-    select(Status_Gauss, everything())
-  Stat_masq_Gauss
-  
-  
-  #Stat sur le masq de tau-argus
-  
-  Stat_masq_tau<- masq2 %>% 
-    group_by(is_secret_prim,is_secret = Status!="V") %>% 
-    summarise(
-      ncell_tau = n(),
-      valcell_tau = sum(N_OBS)
-    )
-  Stat_masq_tau<-Stat_masq_tau %>% 
-    mutate(Status_tau = case_when(
-      is_secret_prim ~ "B",
-      is_secret ~"D",
-      TRUE ~ "V"
-    ))
-  
-  Stat_masq_tau
-  Stat_masq_tau <- Stat_masq_tau[,(ncol(Stat_masq_tau)-2):ncol(Stat_masq_tau)]
-  sums <- colSums(Stat_masq_tau[,1:2])
-  Stat_masq_tau[,1]<-(Stat_masq_tau[,1]*100)/sums[1]
-  Stat_masq_tau[,2]<-(Stat_masq_tau[,2]*100)/sums[2]
-  Stat_masq_tau <- Stat_masq_tau %>%
-    mutate(across(where(is.numeric), ~ round(., 2)))
-  sums <- c(sums,"Total")
-  Stat_masq_tau <- rbind(Stat_masq_tau,sums)
-  Stat_masq_tau <- Stat_masq_tau %>%
-    select(Status_tau, everything())
-  Stat_masq_tau
-  
-  Stat_tot <- cbind(Stat_masq_Gauss,Stat_masq_tau)
-  Stat_tot <- Stat_tot[,-4]
-  colnames(Stat_tot)[1] <- "Status"
-  Stat_tot <- Stat_tot[, c(1, 2, 4, 3,5)]
-  print(Stat_tot)
-  Stat_tot %>% knitr::kable(format = "latex", digits = 1)
-}
 
+stats_sous_tableaux <- unique(activity_corr_table$A10) %>% 
+  purrr::map(
+    \(a10){
+      filtre_a88 <- activity_corr_table %>% filter(A10 == a10) %>% pull(A88)
+      filtre_a21 <- activity_corr_table %>% filter(A10 == a10) %>% pull(A21)
+      masq_gauss_extract <- masq_gauss %>% filter(ACTIVITY %in% c(a10, filtre_a21,filtre_a88))
+      masq_ta_extract <- masq_ta %>% filter(ACTIVITY %in% c(a10, filtre_a21,filtre_a88))
+      comparaison_deux_masque(masq_gauss_extract, masq_ta_extract, 1:2)
+    }
+  )
+names(stats_sous_tableaux) <- unique(activity_corr_table$A10)
+
+stats_sous_tableaux$BE
+
+stats_sous_tableaux_2 <- unique(activity_corr_table$A21) %>% 
+  purrr::map(
+    \(a21){
+      filtre_a88 <- activity_corr_table %>% filter(A21 == a21) %>% pull(A88)
+      # filtre_a21 <- activity_corr_table %>% filter(A10 == a10) %>% pull(A21)
+      masq_gauss_extract <- masq_gauss %>% filter(ACTIVITY %in% c(a21, filtre_a88))
+      masq_ta_extract <- masq_ta %>% filter(ACTIVITY %in% c(a21, filtre_a88))
+      if(nrow(masq_gauss_extract) == 0){
+        return(NULL)
+      }else{
+        return(comparaison_deux_masque(masq_gauss_extract, masq_ta_extract, 1:2))
+      }
+    }
+  )
+names(stats_sous_tableaux_2) <- unique(activity_corr_table$A21)
+stats_sous_tableaux_2$C
+map(stats_sous_tableaux_2, is.null)
 #Tout d'abors on va regarder ces lignes en  plus : 
 #lignes en plus de gausssuppression 
 
