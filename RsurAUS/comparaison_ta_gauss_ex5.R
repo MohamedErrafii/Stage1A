@@ -1,10 +1,10 @@
 rm(list=ls())
 
-#install.packages("rtauargus", repos = "https://nexus.insee.fr/repository/r-public",  type="source")
-#install.packages("GaussSuppression")
-#install.packages("tidyverse")
-#install.packages("curl")
-#install.packages("readxl")
+# install.packages("rtauargus", repos = "https://nexus.insee.fr/repository/r-public",  type="source")
+# install.packages("GaussSuppression")
+# install.packages("tidyverse")
+# install.packages("curl")
+# install.packages("readxl")
 
 library(GaussSuppression)
 library(dplyr)
@@ -105,3 +105,312 @@ lignes_en_plus
 #Si lignes_en_plus contient 0 lignes on peut maintenant faire les statisques sur les différents masques
 
 comparaison_deux_masque(masq_gauss,masq_ta)
+masq_gauss %>% 
+  mutate(Status_Gauss = case_when(
+    primary ~ "B",
+    suppressed ~"D",
+    TRUE ~ "V"
+  )) %>% 
+  select(NUTS, CJ, N_OBS, Status_Gauss) %>% 
+  full_join(
+    masq_ta %>% select(NUTS, CJ, N_OBS, Status),
+    by = c("NUTS", "CJ", "N_OBS")
+  ) %>% 
+  mutate(
+    Status = ifelse(N_OBS == 0, "V", Status)
+  ) %>% 
+  mutate(diff_status = Status_Gauss != Status) %>% 
+  filter(diff_status)
+
+#ce code nous donne les cellules où le flag n'est pas le même, on va s'intéresser aux celles ci de plus près 
+#pour savoir pourquoi le secret à été poser différemment
+
+
+
+stats_sous_tableaux <- unique(nuts23_fr_corr_table$NUTS2) %>% 
+  purrr::map(
+    \(nuts2){
+      filtre_NUTS3 <- nuts23_fr_corr_table %>% filter(NUTS2 == nuts2) %>% pull(NUTS3)
+      masq_gauss_extract <- masq_gauss %>% filter(NUTS %in% c(nuts2, filtre_NUTS3))
+      masq_ta_extract <- masq_ta %>% filter(NUTS %in% c(nuts2, filtre_NUTS3))
+      comparaison_deux_masque(masq_gauss_extract, masq_ta_extract, 1:2)
+    }
+  )
+names(stats_sous_tableaux) <- unique(nuts23_fr_corr_table$NUTS2)
+
+stats_sous_tableaux$FR24
+stats_sous_tableaux$FR41
+stats_sous_tableaux$FR43
+stats_sous_tableaux$FR52
+stats_sous_tableaux$FR53
+stats_sous_tableaux$FR62
+stats_sous_tableaux$FR72
+stats_sous_tableaux$FR81
+
+#Pour FR24 
+
+filtered_data <- a_filtrer[grepl("FR24", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, NUTS %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("FR24", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, NUTS %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("NUTS","CJ","N_OBS"))
+merged_data <- merged_data[,c("NUTS","CJ","N_OBS","primary","suppressed","is_secret_prim","Status")]
+
+print(merged_data)
+merged_data_visuel <- merged_data[,c("NUTS","CJ","N_OBS")] %>% 
+  pivot_wider(names_from = "NUTS", values_from = 'N_OBS')
+
+merged_data_visuel<-merged_data_visuel %>% 
+  select(-FR24,FR24)
+merged_data_visuel <- merged_data_visuel %>% 
+  slice(-1) %>% 
+  add_row(merged_data_visuel[1,])
+latex_FR24 <- merged_data_visuel <- merged_data_visuel %>% 
+  knitr::kable(format = "latex", digits = 1)
+latex_FR24
+
+#Pour FR41 
+
+filtered_data <- a_filtrer[grepl("FR41", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, NUTS %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("FR41", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, NUTS %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("NUTS","CJ","N_OBS"))
+merged_data <- merged_data[,c("NUTS","CJ","N_OBS","primary","suppressed","is_secret_prim","Status")]
+
+print(merged_data)
+merged_data_visuel <- merged_data[,c("NUTS","CJ","N_OBS")] %>% 
+  pivot_wider(names_from = "NUTS", values_from = 'N_OBS')
+
+merged_data_visuel<-merged_data_visuel %>% 
+  select(-FR41,FR41)
+merged_data_visuel <- merged_data_visuel %>% 
+  slice(-1) %>% 
+  add_row(merged_data_visuel[1,])
+latex_FR41 <- merged_data_visuel <- merged_data_visuel %>% 
+  knitr::kable(format = "latex", digits = 1)
+latex_FR41
+
+#Pour FR43 
+
+filtered_data <- a_filtrer[grepl("FR43", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, NUTS %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("FR43", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, NUTS %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("NUTS","CJ","N_OBS"))
+merged_data <- merged_data[,c("NUTS","CJ","N_OBS","primary","suppressed","is_secret_prim","Status")]
+
+print(merged_data)
+merged_data_visuel <- merged_data[,c("NUTS","CJ","N_OBS")] %>% 
+  pivot_wider(names_from = "NUTS", values_from = 'N_OBS')
+
+merged_data_visuel<-merged_data_visuel %>% 
+  select(-FR43,FR43)
+merged_data_visuel <- merged_data_visuel %>% 
+  slice(-1) %>% 
+  add_row(merged_data_visuel[1,])
+latex_FR43 <- merged_data_visuel <- merged_data_visuel %>% 
+  knitr::kable(format = "latex", digits = 1)
+latex_FR43
+
+#Pour FR52 
+
+filtered_data <- a_filtrer[grepl("FR52", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, NUTS %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("FR52", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, NUTS %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("NUTS","CJ","N_OBS"))
+merged_data <- merged_data[,c("NUTS","CJ","N_OBS","primary","suppressed","is_secret_prim","Status")]
+
+print(merged_data)
+merged_data_visuel <- merged_data[,c("NUTS","CJ","N_OBS")] %>% 
+  pivot_wider(names_from = "NUTS", values_from = 'N_OBS')
+
+merged_data_visuel<-merged_data_visuel %>% 
+  select(-FR52,FR52)
+merged_data_visuel <- merged_data_visuel %>% 
+  slice(-1) %>% 
+  add_row(merged_data_visuel[1,])
+latex_FR52 <- merged_data_visuel <- merged_data_visuel %>% 
+  knitr::kable(format = "latex", digits = 1)
+latex_FR52
+
+#Pour FR53 
+
+filtered_data <- a_filtrer[grepl("FR53", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, NUTS %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("FR53", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, NUTS %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("NUTS","CJ","N_OBS"))
+merged_data <- merged_data[,c("NUTS","CJ","N_OBS","primary","suppressed","is_secret_prim","Status")]
+
+print(merged_data)
+merged_data_visuel <- merged_data[,c("NUTS","CJ","N_OBS")] %>% 
+  pivot_wider(names_from = "NUTS", values_from = 'N_OBS')
+
+merged_data_visuel<-merged_data_visuel %>% 
+  select(-FR53,FR53)
+merged_data_visuel <- merged_data_visuel %>% 
+  slice(-1) %>% 
+  add_row(merged_data_visuel[1,])
+latex_FR53 <- merged_data_visuel <- merged_data_visuel %>% 
+  knitr::kable(format = "latex", digits = 1)
+latex_FR53
+
+#Pour FR62 
+
+filtered_data <- a_filtrer[grepl("FR62", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, NUTS %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("FR62", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, NUTS %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("NUTS","CJ","N_OBS"))
+merged_data <- merged_data[,c("NUTS","CJ","N_OBS","primary","suppressed","is_secret_prim","Status")]
+
+print(merged_data)
+merged_data_visuel <- merged_data[,c("NUTS","CJ","N_OBS")] %>% 
+  pivot_wider(names_from = "NUTS", values_from = 'N_OBS')
+
+merged_data_visuel<-merged_data_visuel %>% 
+  select(-FR62,FR62)
+merged_data_visuel <- merged_data_visuel %>% 
+  slice(-1) %>% 
+  add_row(merged_data_visuel[1,])
+latex_FR62 <- merged_data_visuel <- merged_data_visuel %>% 
+  knitr::kable(format = "latex", digits = 1)
+latex_FR62
+
+#Pour FR72 
+
+filtered_data <- a_filtrer[grepl("FR72", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, NUTS %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("FR72", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, NUTS %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("NUTS","CJ","N_OBS"))
+merged_data <- merged_data[,c("NUTS","CJ","N_OBS","primary","suppressed","is_secret_prim","Status")]
+
+print(merged_data)
+merged_data_visuel <- merged_data[,c("NUTS","CJ","N_OBS")] %>% 
+  pivot_wider(names_from = "NUTS", values_from = 'N_OBS')
+
+merged_data_visuel<-merged_data_visuel %>% 
+  select(-FR72,FR72)
+merged_data_visuel <- merged_data_visuel %>% 
+  slice(-1) %>% 
+  add_row(merged_data_visuel[1,])
+latex_FR72 <- merged_data_visuel <- merged_data_visuel %>% 
+  knitr::kable(format = "latex", digits = 1)
+latex_FR72
+
+#Pour FR81 
+
+filtered_data <- a_filtrer[grepl("FR81", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_gauss <- subset(masq_gauss, NUTS %in% unique_cells)
+print(filtered_data2_gauss)
+
+#Pour Tau-Argus
+filtered_data <- a_filtrer[grepl("FR81", a_filtrer$NUTS2), ]
+flattened_data <- c(as.matrix(filtered_data))
+unique_cells <- unique(flattened_data)
+print(unique_cells)
+filtered_data2_ta <- subset(masq_ta, NUTS %in% unique_cells)
+print(filtered_data2_ta)
+
+merged_data <- inner_join(filtered_data2_gauss, filtered_data2_ta, by = c("NUTS","CJ","N_OBS"))
+merged_data <- merged_data[,c("NUTS","CJ","N_OBS","primary","suppressed","is_secret_prim","Status")]
+
+print(merged_data)
+merged_data_visuel <- merged_data[,c("NUTS","CJ","N_OBS")] %>% 
+  pivot_wider(names_from = "NUTS", values_from = 'N_OBS')
+
+merged_data_visuel<-merged_data_visuel %>% 
+  select(-FR81,FR81)
+merged_data_visuel <- merged_data_visuel %>% 
+  slice(-1) %>% 
+  add_row(merged_data_visuel[1,])
+latex_FR81 <- merged_data_visuel <- merged_data_visuel %>% 
+  knitr::kable(format = "latex", digits = 1)
+latex_FR81
+
+
+
+
